@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "cd backend; $env:UV_LINK_MODE='copy'; $env:UV_PROJECT_ENVIRONMENT=\"$env:LOCALAPPDATA\\scat-console\\venv\"; uv run python -m uvicorn app.main:app --port 8000"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-Command", "cd frontend; npm run dev"],
+      "port": 5173
+    }
+  ]
+}

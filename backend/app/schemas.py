@@ -228,3 +228,32 @@ class SendResult(BaseModel):
     state: Literal["SENT", "FAILED"]
     failure_reason: str | None
     warnings: list[str]
+
+
+# --- Admin ------------------------------------------------------------------------------
+
+
+class ReturnFlightIn(BaseModel):
+    model_config = _Edit
+    outbound_flt_nbr: str = Field(pattern=r"^[A-Z0-9]{1,5}$")
+    day_offset: Literal[0, 1]
+    is_active: bool = True
+
+
+class ReturnFlight(ReturnFlightIn):
+    airline: str
+    return_flt_nbr: str
+    updated_by: str
+    updated_at: datetime
+
+
+class AirlineSettingIn(BaseModel):
+    model_config = _Edit
+    auto_release: bool
+    auto_release_hold_min: int = Field(ge=0, le=1440)
+
+
+class AirlineSetting(AirlineSettingIn):
+    airline: str
+    updated_by: str
+    updated_at: datetime

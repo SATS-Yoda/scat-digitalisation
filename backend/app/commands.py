@@ -8,7 +8,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError
 
 from . import tables as t
-from .auth import User, require_plant
+from .auth import User, require_admin, require_plant
 from .dify import SapSendResult
 from .queries import outbound_for, return_for, return_maps
 from .schemas import SectorEdit
@@ -448,3 +448,58 @@ def finish_send(conn: Connection, send_id: int, inputs: dict, result: SapSendRes
         values["i034_file_name"] = result.i034_file_name
     conn.execute(update(t.sap_send).where(t.sap_send.c.send_id == send_id).values(values))
     return {"state": values["state"], "failure_reason": values["failure_reason"]}
+
+
+def save_return_flight(
+    conn: Connection, user: User, airline: str, return_flt_nbr: str, outbound_flt_nbr: str,
+    day_offset: int, is_active: bool,
+) -> None:  # fmt: skip
+    """Create or update a return-flight mapping. An outbound flight keeps one active
+    return flight: the console groups and sends exactly one."""
+    require_admin(user)
+    if return_flt_nbr == outbound_flt_nbr:
+        raise Invalid("The return flight and the outbound flight must differ")
+    m = t.return_map.c
+    key = (m.airline == airline, m.return_flt_nbr == return_flt_nbr)
+    if is_active:
+        other = conn.execute(
+            select(m.return_flt_nbr).where(
+                m.airline == airline,
+                m.outbound_flt_nbr == outbound_flt_nbr,
+                m.return_flt_nbr != return_flt_nbr,
+                m.is_active,
+            )
+        ).scalar()
+        if other:
+            raise Conflict(
+                f"{airline} {outbound_flt_nbr} already has the active return flight "
+                f"{airline} {other}; deactivate that mapping first"
+            )
+    values = {
+        "outbound_flt_nbr": outbound_flt_nbr,
+        "day_offset": day_offset,
+        "is_active": is_active,
+        "updated_by": user.id,
+        "updated_at": datetime.now(UTC),
+    }
+    if conn.execute(select(func.count()).select_from(t.return_map).where(*key)).scalar():
+        conn.execute(update(t.return_map).where(*key).values(values))
+    else:
+        conn.execute(
+            insert(t.return_map).values(airline=airline, return_flt_nbr=return_flt_nbr, **values)
+        )
+
+
+def save_airline_setting(
+    conn: Connection, user: User, airline: str, auto_release: bool, auto_release_hold_min: int
+) -> None:
+    require_admin(user)
+    c = t.airline_config.c
+    values = {"auto_release": auto_release, "auto_release_hold_min": auto_release_hold_min,
+              "updated_by": user.id, "updated_at": datetime.now(UTC)}  # fmt: skip
+    if conn.execute(
+        select(func.count()).select_from(t.airline_config).where(c.airline == airline)
+    ).scalar():
+        conn.execute(update(t.airline_config).where(c.airline == airline).values(values))
+    else:
+        conn.execute(insert(t.airline_config).values(airline=airline, **values))

@@ -11,14 +11,20 @@ class Forbidden(Exception):
 class User:
     id: str
     plants: frozenset[str]
+    is_admin: bool = False
 
 
 def current_user() -> User:
     """Stand-in until Entra sign-in (build order step 5) supplies the real user and groups."""
-    return User(id="dev-user", plants=frozenset({"ICC1", "ICC2"}))
+    return User(id="dev-user", plants=frozenset({"ICC1", "ICC2"}), is_admin=True)
 
 
 def require_plant(user: User, airline: str) -> None:
     plant = plant_for(airline)
     if plant not in user.plants:
         raise Forbidden(f"{airline} flights belong to {plant}, which this user cannot act on")
+
+
+def require_admin(user: User) -> None:
+    if not user.is_admin:
+        raise Forbidden("Only an administrator can change console settings")

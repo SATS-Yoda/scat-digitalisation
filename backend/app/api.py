@@ -4,10 +4,11 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.engine import Connection, Engine
 
 from . import commands, queries, schemas
+from . import tables as t
 from .auth import Forbidden, User, current_user
 from .dify import SapSendResult
 
@@ -159,5 +160,36 @@ def create_app(engine: Engine, sap_sender: SapSender | None = None) -> FastAPI:
         with engine.begin() as conn:
             outcome = commands.finish_send(conn, claim["send_id"], claim["inputs"], result)
         return {**outcome, "warnings": claim["warnings"]}
+
+    # --- Admin ---------------------------------------------------------------------------
+
+    @app.get("/api/admin/return-flights", response_model=list[schemas.ReturnFlight])
+    def list_return_flights(conn: Conn):
+        m = t.return_map.c
+        rows = conn.execute(
+            select(t.return_map).order_by(m.airline, m.outbound_flt_nbr, m.return_flt_nbr)
+        )
+        return rows.mappings().all()
+
+    @app.put("/api/admin/return-flights/{airline}/{flt_nbr}", status_code=204)
+    def save_return_flight(
+        tx: Tx, me: Me, airline: Airline, flt_nbr: FltNbr, body: schemas.ReturnFlightIn
+    ) -> None:
+        commands.save_return_flight(
+            tx, me, airline, flt_nbr, body.outbound_flt_nbr, body.day_offset, body.is_active
+        )
+
+    @app.get("/api/admin/airline-settings", response_model=list[schemas.AirlineSetting])
+    def list_airline_settings(conn: Conn):
+        rows = conn.execute(select(t.airline_config).order_by(t.airline_config.c.airline))
+        return rows.mappings().all()
+
+    @app.put("/api/admin/airline-settings/{airline}", status_code=204)
+    def save_airline_setting(
+        tx: Tx, me: Me, airline: Airline, body: schemas.AirlineSettingIn
+    ) -> None:
+        commands.save_airline_setting(
+            tx, me, airline, body.auto_release, body.auto_release_hold_min
+        )
 
     return app

@@ -4,8 +4,8 @@ Console for reviewing, editing and sending airline meal requests (I033 and I034)
 Design and open questions: [docs/HANDOVER.md](docs/HANDOVER.md). Columns of the existing
 tables: [docs/result_export.json](docs/result_export.json).
 
-Status: build order steps 2 and 3 (backend read side, edits and Send) are in place. Not
-built yet: the migration for the console tables (step 1), frontend (4), Entra sign-in (5),
+Status: build order steps 2 to 4 (backend read side, edits and Send, frontend) are in
+place. Not built yet: the migration for the console tables (step 1), Entra sign-in (5),
 auto-release (6).
 
 ## Run the backend locally
@@ -39,6 +39,33 @@ On a SATS laptop set these first (user environment variables are simplest):
 | `UV_LINK_MODE` | `copy` | OneDrive folders reject hard links |
 | `UV_PROJECT_ENVIRONMENT` | `%LOCALAPPDATA%\scat-console\venv` | Keeps the virtual environment out of OneDrive sync |
 
+## Run the frontend locally
+
+Needs Node 18 or later and the backend running on port 8000. From `frontend/`:
+
+```powershell
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173. The dev server forwards `/api` to the backend. The seed
+flights are dated 13 and 14 Nov 2026, so set the dashboard dates to that range. Checks:
+
+```powershell
+npm run typecheck
+npm test
+npm run build
+```
+
+On a SATS laptop npm needs the corporate root certificates. Export the Windows trusted
+roots to a PEM file once and set `NODE_EXTRA_CA_CERTS` to its path (user environment
+variable). Do not turn off `strict-ssl`.
+
+Screens: flight list with filters kept in the URL; flight-stage page with the source email
+beside editable I033 and I034, review items, version history, the AMF on P06H, and the
+Send, Do not release and Mark reviewed actions; admin pages for return flights and airline
+settings. Design tokens and fonts are vendored unchanged in `frontend/src/styles/sats/`.
+
 ## Endpoints
 
 `{stage}` is `/api/flights/{airline}/{flt_nbr}/{actdate}/stages/{status}`.
@@ -55,6 +82,8 @@ On a SATS laptop set these first (user environment variables are simplest):
 | `POST {stage}/send` | Sends the outbound flight and its return flight to SAP through Dify |
 | `POST {stage}/not-released` | Records the decision not to send (can still be sent later) |
 | `POST /api/review-items/{id}/resolve` | Closes a review item as `AMENDED` or `ACCEPTED` |
+| `GET`, `PUT /api/admin/return-flights[/{airline}/{return_flt_nbr}]` | Lists and saves return-flight mappings (admin) |
+| `GET`, `PUT /api/admin/airline-settings[/{airline}]` | Lists and saves auto-release settings (admin) |
 | `GET /health`, `GET /ready` | Liveness; readiness (checks the database) |
 
 Write rules, in short: a stage that was sent, or is being sent, refuses every change (409).
@@ -83,7 +112,17 @@ send can be retried and reuses its file number.
 - **AMF.** Rules follow the requirement document (Annex 12, Appendix C). Crew (staff) pax
   are left off the form.
 - **One return flight per outbound flight.** The mapping table's key would allow several;
-  the console shows one.
+  the admin endpoint refuses a second active one.
+- **Node 18, not 20.** The development laptop has Node 18, so the frontend uses Vite 5,
+  Tailwind 3 and React Router 6, which run on it. Move to Node 20 with the container image.
+- **shadcn/ui components are written by hand** in `frontend/src/components/ui/` (Button,
+  Input, Label, Textarea, Dialog) in the shadcn form on Radix, instead of being pulled with
+  the shadcn CLI. Tables are the dense custom table the design standard allows.
+- **No ESLint or component tests yet.** The frontend has type checking and unit tests for
+  its pure helpers only.
+- **The frontend is not served by FastAPI yet.** In development Vite serves it; serving the
+  built files from the backend comes with the container image.
+- **Airline settings are stored but not used** until auto-release (step 6) is built.
 - **Source email shows `body_preview` only.** Reading the full text from Blob storage needs
   the URI format of `eml_uri` / `text_uri` and an identity for the storage account.
 - **Seed data is synthetic.** Class codes in the I033 slot columns are placeholders.

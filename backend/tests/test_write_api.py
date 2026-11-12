@@ -283,3 +283,38 @@ def test_second_send_during_a_send_is_refused(client, sender):
         thread.join(30)
     assert first["response"].json()["state"] == "SENT"
     assert len(sender.calls) == 1
+
+
+# --- Admin ------------------------------------------------------------------------------
+
+
+def test_return_flight_mapping_is_maintained_by_an_admin(app, client):
+    url = "/api/admin/return-flights"
+    new = {"outbound_flt_nbr": "943", "day_offset": 0, "is_active": True}
+    assert client.put(f"{url}/QR/944", json=new).status_code == 204
+    flights = client.get("/api/flights", params={"airline": "QR"}).json()
+    assert flights[0]["return_flight"]["flt_nbr"] == "944"
+    assert flights[0]["return_flight"]["actdate"] == "2026-11-13"
+
+    # One active return flight per outbound flight.
+    assert client.put(f"{url}/QR/946", json=new).status_code == 409
+    assert client.put(f"{url}/QR/944", json={**new, "is_active": False}).status_code == 204
+    assert client.put(f"{url}/QR/946", json=new).status_code == 204
+    assert client.put(f"{url}/QR/943", json=new).status_code == 422  # same as outbound
+    assert client.put(f"{url}/QR/945", json={**new, "day_offset": 2}).status_code == 422
+    rows = {r["return_flt_nbr"]: r for r in client.get(url).json() if r["airline"] == "QR"}
+    assert (rows["944"]["is_active"], rows["946"]["updated_by"]) == (False, "dev-user")
+
+    app.dependency_overrides[current_user] = lambda: User("user", frozenset({"ICC1", "ICC2"}))
+    assert client.put(f"{url}/QR/948", json=new).status_code == 403
+
+
+def test_airline_settings(client):
+    url = "/api/admin/airline-settings"
+    assert client.get(url).json() == []
+    body = {"auto_release": True, "auto_release_hold_min": 45}
+    assert client.put(f"{url}/QR", json=body).status_code == 204
+    assert client.put(f"{url}/QR", json={**body, "auto_release_hold_min": 30}).status_code == 204
+    [row] = client.get(url).json()
+    assert (row["airline"], row["auto_release"], row["auto_release_hold_min"]) == ("QR", True, 30)
+    assert client.put(f"{url}/QR", json={**body, "auto_release_hold_min": -1}).status_code == 422
