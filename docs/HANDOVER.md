@@ -40,7 +40,7 @@ Out of scope for this repo: the Logic App and both Dify workflows (owned by the 
 | 2 | Backend read side | Done, commit `0b95297` |
 | 3 | Backend edits, review, Send | Done, commit `8983cb0` |
 | 4 | Frontend, plus admin endpoints | Done, commit `1969136` |
-| 5 | Entra sign-in and roles | Backend built and uncommitted, tested with fakes only. Frontend changes not started. Never run against Entra or Redis: blocked on IT for real values |
+| 5 | Entra sign-in and roles | Backend built, commit `d12a86e`, tested with fakes only. Frontend changes not started. Never run against Entra or Redis: blocked on IT for real values |
 | 6 | Auto-release | Not started |
 
 All work is on the local branch `feat/backend-read-side`. Nothing has been pushed and there
@@ -193,7 +193,7 @@ Output (proposed, not confirmed by the intern; `backend/app/dify.py` reads this 
 The workflow writes `sent_to_sap_at` only after both files uploaded, on the outbound and
 the return rows.
 
-## Added 12 Nov 2026 (uncommitted)
+## Added 12 Nov 2026 (commits `d12a86e`, `6e9b7d1`)
 
 - **Audit trail page** (`/audit`, `GET /api/audit`): built from records that already exist
   (I033 versions, reviewed-OK marks, resolved review items, send decisions). No new table.
@@ -231,7 +231,7 @@ the return rows.
 
 Step 5, Entra sign-in and roles:
 
-Built (uncommitted, 54 backend tests pass on SQLite): `IdentityProvider` and `SessionStore`
+Built (54 backend tests pass on SQLite): `IdentityProvider` and `SessionStore`
 interfaces, `/auth/login`, `/auth/callback`, `/auth/logout`, `/api/me`, an opaque httpOnly
 session cookie, a per-session CSRF token checked on every write, group-to-plant and admin
 mapping, plant-scoped reads (the flight list is filtered; stage, version, AMF and email
