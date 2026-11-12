@@ -1,9 +1,18 @@
-import { ArrowLeftRight, LayoutDashboard, type LucideIcon, Moon, SlidersHorizontal, Sun } from "lucide-react";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import {
+  History,
+  LayoutDashboard,
+  type LucideIcon,
+  Moon,
+  RefreshCw,
+  SlidersHorizontal,
+  Sun,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/format";
+import { cn, formatTimestamp } from "@/lib/format";
 
 const THEME_KEY = "scat-console-theme";
 
@@ -34,6 +43,33 @@ function NavItem({ to, icon: Icon, children }: { to: string; icon: LucideIcon; c
       <Icon className="size-4" strokeWidth={1.75} aria-hidden />
       {children}
     </NavLink>
+  );
+}
+
+/** When data on screen was last fetched, with a button to fetch it again. Re-renders when a
+ *  fetch starts or ends, which is when the newest timestamp can change. */
+function LastRefreshed() {
+  const queryClient = useQueryClient();
+  const fetching = useIsFetching() > 0;
+  const updatedAt = Math.max(0, ...queryClient.getQueryCache().getAll().map((q) => q.state.dataUpdatedAt));
+  return (
+    <div className="flex items-center justify-end gap-xs text-xs text-content-muted">
+      <span>
+        Last refreshed{" "}
+        <time className="num text-content-secondary" dateTime={updatedAt ? new Date(updatedAt).toISOString() : undefined}>
+          {updatedAt ? formatTimestamp(updatedAt) : "not yet"}
+        </time>
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Refresh data"
+        disabled={fetching}
+        onClick={() => queryClient.invalidateQueries()}
+      >
+        <RefreshCw strokeWidth={1.75} />
+      </Button>
+    </div>
   );
 }
 
@@ -69,19 +105,17 @@ export function Layout() {
           <NavItem to="/" icon={LayoutDashboard}>
             Flights
           </NavItem>
-          <span className="hidden px-sm pt-sm text-xs font-semibold uppercase tracking-wider text-content-muted lg:block">
-            Admin
-          </span>
-          <NavItem to="/admin/return-flights" icon={ArrowLeftRight}>
-            Return flights
+          <NavItem to="/audit" icon={History}>
+            Audit trail
           </NavItem>
-          <NavItem to="/admin/airline-settings" icon={SlidersHorizontal}>
-            Airline settings
+          <NavItem to="/admin" icon={SlidersHorizontal}>
+            Admin settings
           </NavItem>
         </nav>
       </aside>
       <main className="min-w-0 bg-surface-secondary p-md lg:p-lg">
         <div className="mx-auto flex max-w-desktop flex-col gap-md">
+          <LastRefreshed />
           <Outlet />
         </div>
       </main>

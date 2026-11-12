@@ -26,6 +26,16 @@ export function formatDateTime(iso: string | null): string {
   );
 }
 
+/** Local date and time from epoch milliseconds, 24-hour with seconds: "12 Nov 2026 15:51:10". */
+export function formatTimestamp(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${pad(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  );
+}
+
 /** Local calendar date as "YYYY-MM-DD", `offsetDays` from today. */
 export function isoDate(offsetDays = 0, now = new Date()): string {
   const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offsetDays);

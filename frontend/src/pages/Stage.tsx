@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Ban, CheckCircle2, Eye, FileX, Info, Lock, Mail, Send, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, ArrowLeft, Ban, CheckCircle2, Eye, FileX, Info, Lock, Mail, Send, ShieldAlert } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import {
@@ -28,6 +28,7 @@ import {
   type StageDetail,
   type Status,
 } from "@/lib/api";
+import { findEvidence } from "@/lib/evidence";
 import { cn, flightName, formatDate, formatDateTime, signed, stageRoute } from "@/lib/format";
 
 const CABINS: [string, string][] = [
@@ -37,14 +38,51 @@ const CABINS: [string, string][] = [
   ["Y", "Economy"],
 ];
 
-function EmailPanel({ emailId }: { emailId: number | null }) {
+/** The body text with the hovered review item's evidence marked. */
+function EmailBody({ text, evidence }: { text: string; evidence: ReviewItem | null }) {
+  const found = evidence ? findEvidence(text, evidence) : null;
+  const markRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    markRef.current?.scrollIntoView({ block: "nearest" });
+  }, [found?.start, found?.end]);
+  if (!found) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, found.start)}
+      <mark
+        ref={markRef}
+        className="rounded-xs px-[2px] font-semibold text-content-primary underline decoration-2 underline-offset-2"
+        style={{ background: "color-mix(in srgb, var(--color-warning) 40%, transparent)" }}
+      >
+        {text.slice(found.start, found.end)}
+      </mark>
+      {text.slice(found.end)}
+    </>
+  );
+}
+
+function EmailPanel({
+  emailId,
+  stickyFrom,
+  evidence,
+}: {
+  emailId: number | null;
+  stickyFrom: "xl" | "2xl";
+  evidence: ReviewItem | null;
+}) {
   const query = useQuery({
     queryKey: ["email", emailId],
     queryFn: () => api.email(emailId!),
     enabled: emailId !== null,
   });
   return (
-    <Card className="xl:sticky xl:top-lg xl:max-h-[calc(100vh-48px)] xl:overflow-y-auto">
+    <Card
+      className={cn(
+        "max-h-[calc(100vh-48px)] overflow-y-auto",
+        // Stays in view while editing, unless the AMF sits below it in the same column.
+        stickyFrom === "xl" ? "xl:sticky xl:top-lg" : "2xl:sticky 2xl:top-lg",
+      )}
+    >
       <CardHeader title="Source email" />
       {emailId === null ? (
         <EmptyState icon={Mail} title="No source email">
@@ -71,7 +109,11 @@ function EmailPanel({ emailId }: { emailId: number | null }) {
             ) : null}
           </dl>
           <pre className="num overflow-x-auto whitespace-pre-wrap rounded-md border bg-surface-secondary p-sm text-xs leading-relaxed">
-            {query.data.body_preview ?? "The email has no text preview"}
+            {query.data.body_preview === null ? (
+              "The email has no text preview"
+            ) : (
+              <EmailBody text={query.data.body_preview} evidence={evidence && (evidence.email_id === null || evidence.email_id === emailId) ? evidence : null} />
+            )}
           </pre>
         </div>
       )}
@@ -132,7 +174,15 @@ function ResolveDialog({ item, onDone, onClose }: { item: ReviewItem; onDone: ()
   );
 }
 
-function ReviewItems({ items, onChanged }: { items: ReviewItem[]; onChanged: () => void }) {
+function ReviewItems({
+  items,
+  onChanged,
+  onEvidence,
+}: {
+  items: ReviewItem[];
+  onChanged: () => void;
+  onEvidence: (item: ReviewItem | null) => void;
+}) {
   const [resolving, setResolving] = useState<ReviewItem | null>(null);
   return (
     <Card>
@@ -145,7 +195,14 @@ function ReviewItems({ items, onChanged }: { items: ReviewItem[]; onChanged: () 
       ) : (
         <ul className="flex flex-col gap-xs">
           {items.map((item) => (
-            <li key={item.review_item_id} className="flex flex-wrap items-start gap-sm rounded-md border p-sm">
+            <li
+              key={item.review_item_id}
+              className="flex flex-wrap items-start gap-sm rounded-md border p-sm hover:bg-surface-hover"
+              onMouseEnter={() => onEvidence(item)}
+              onMouseLeave={() => onEvidence(null)}
+              onFocus={() => onEvidence(item)}
+              onBlur={() => onEvidence(null)}
+            >
               <div className="flex min-w-0 flex-1 flex-col gap-xxs text-sm">
                 <div className="flex flex-wrap items-center gap-xs">
                   {item.blocks_release ? (
@@ -191,7 +248,7 @@ function AmfPanel({ flight }: { flight: FlightRef }) {
           The form is generated once both P24H and P06H data exist for the flight.
         </EmptyState>
       ) : (
-        <div className="flex flex-col gap-md">
+        <div className="flex flex-col gap-lg divide-y">
           {query.data.map((form) => (
             <AmfTable key={form.amf_id} form={form} showSector={query.data.length > 1} />
           ))}
@@ -202,71 +259,96 @@ function AmfPanel({ flight }: { flight: FlightRef }) {
 }
 
 function AmfTable({ form, showSector }: { form: Amf; showSector: boolean }) {
-  const pax = (cabin: string) =>
-    form.lines.filter((l) => l.line_type === "PAX" && l.cabin === cabin).reduce((n, l) => n + (l.pax_p06h ?? 0), 0);
-  const hasCabin = (cabin: string) => form.lines.some((l) => l.cabin === cabin);
-  const spml = form.lines.filter((l) => l.line_type === "SPML");
-  const mealTypes = [...new Set(spml.map((l) => l.meal_type ?? ""))];
+  const cabinName = (code: string) => CABINS.find(([c]) => c === code)?.[1] ?? code;
+  const cabinRank = (code: string) => CABINS.findIndex(([c]) => c === code);
+  const pax = CABINS.map(([code, name]) => {
+    const lines = form.lines.filter((l) => l.line_type === "PAX" && l.cabin === code);
+    return { code, name, present: lines.length > 0, total: lines.reduce((n, l) => n + (l.pax_p06h ?? 0), 0) };
+  }).filter((row) => row.present);
+  const meals = form.lines
+    .filter((l) => l.line_type === "SPML")
+    .sort(
+      (a, b) =>
+        cabinRank(a.cabin ?? "") - cabinRank(b.cabin ?? "") ||
+        (a.meal_type ?? "").localeCompare(b.meal_type ?? "") ||
+        (a.spml_id ?? "").localeCompare(b.spml_id ?? ""),
+    );
   return (
-    <div className="overflow-x-auto">
-      <table className="tbl">
-        <caption className="pb-xs text-left text-xs text-content-muted">
-          {showSector ? `Sector ${form.sector_nbr}, version` : "Version"} {form.amf_version}, generated{" "}
-          {formatDateTime(form.generated_at)}
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Meal type</th>
-            {CABINS.map(([code, name]) => (
-              <th key={code} scope="col">
-                {name}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th scope="row" className="!bg-transparent">
-              P06H pax
-            </th>
-            {CABINS.map(([code]) => (
-              <td key={code} className="num">
-                {hasCabin(code) && form.lines.some((l) => l.line_type === "PAX" && l.cabin === code)
-                  ? `${pax(code)} pax`
-                  : ""}
-              </td>
-            ))}
-          </tr>
-          {mealTypes.length === 0 ? (
+    <section className="flex flex-col gap-sm">
+      <p className="text-xs text-content-muted">
+        {showSector ? `Sector ${form.sector_nbr}, version` : "Version"} {form.amf_version}, generated{" "}
+        {formatDateTime(form.generated_at)}
+      </p>
+      <div className="flex flex-col gap-xxs">
+        <h3 className="text-sm font-semibold">Passengers at P06H</h3>
+        <table className="tbl">
+          <thead>
             <tr>
-              <td colSpan={5} className="text-content-muted">
-                No special meal changes between P24H and P06H
-              </td>
+              <th scope="col">Cabin</th>
+              <th scope="col" className="text-right">
+                Pax
+              </th>
             </tr>
-          ) : (
-            mealTypes.map((mealType) => (
-              <tr key={mealType}>
-                <th scope="row" className="num !bg-transparent">
-                  {mealType || "Any"}
-                </th>
-                {CABINS.map(([code]) => (
-                  <td key={code} className="num">
-                    {spml
-                      .filter((l) => (l.meal_type ?? "") === mealType && l.cabin === code)
-                      .map((l) => (
-                        <div key={l.amf_line_id}>
-                          {signed(l.delta_qty!)} {l.spml_id}
-                          {l.source_class !== code ? ` (${l.source_class})` : ""}
-                        </div>
-                      ))}
-                  </td>
-                ))}
+          </thead>
+          <tbody>
+            {pax.length === 0 ? (
+              <tr>
+                <td colSpan={2} className="text-content-muted">
+                  No passenger lines on this form
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
+            ) : (
+              pax.map((row) => (
+                <tr key={row.code}>
+                  <th scope="row" className="!bg-transparent">
+                    {row.name}
+                  </th>
+                  <td className="num text-right">{row.total}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-col gap-xxs">
+        <h3 className="text-sm font-semibold">Special meal changes, P24H to P06H</h3>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th scope="col">Cabin</th>
+              <th scope="col">Meal type</th>
+              <th scope="col">Code</th>
+              <th scope="col" className="text-right">
+                Change
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {meals.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-content-muted">
+                  No special meal changes between P24H and P06H
+                </td>
+              </tr>
+            ) : (
+              meals.map((l) => (
+                <tr key={l.amf_line_id}>
+                  <td>
+                    {cabinName(l.cabin ?? "")}
+                    {l.source_class !== l.cabin ? (
+                      <span className="num text-xs text-content-muted"> ({l.source_class})</span>
+                    ) : null}
+                  </td>
+                  <td className="num">{l.meal_type || "Any"}</td>
+                  <td className="num">{l.spml_id}</td>
+                  <td className="num text-right font-semibold">{signed(l.delta_qty!)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -382,6 +464,7 @@ export function StagePage() {
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<"send" | "not-released" | null>(null);
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
+  const [evidence, setEvidence] = useState<ReviewItem | null>(null);
 
   const query = useQuery({ queryKey: ["stage", flight, status], queryFn: () => api.stage(flight, status) });
 
@@ -449,6 +532,7 @@ export function StagePage() {
   const emailId = stage.sectors.map((s) => s.i033.source_email_id).find((id) => id !== null) ?? null;
   const isReturn = stage.return_of !== null;
   const failed = stage.state === "FAILED";
+  const withAmf = status === "P06H";
 
   return (
     <>
@@ -476,16 +560,21 @@ export function StagePage() {
               {blocking === 1 ? "it" : "them"} below first.
             </span>
           ) : stage.return_flight ? (
-            <span>
-              Sent together with return flight{" "}
-              <Link
-                className="num font-semibold link"
-                to={stageRoute(stage.return_flight, status)}
-              >
-                {flightName(stage.return_flight)} on {formatDate(stage.return_flight.actdate)}
-              </Link>
-              {stage.return_flight_missing ? ", which has no data for this stage yet" : ""}.
-            </span>
+            <>
+              <span>
+                Sending to SAP will include return flight{" "}
+                <Link className="num font-semibold link" to={stageRoute(stage.return_flight, status)}>
+                  {flightName(stage.return_flight)} on {formatDate(stage.return_flight.actdate)}
+                </Link>
+                .
+              </span>
+              {stage.return_flight_missing ? (
+                <span className="flex items-center gap-xs text-content-secondary">
+                  <AlertTriangle className="size-4 text-status-warning" strokeWidth={1.75} aria-hidden />
+                  The return flight has no {status} data yet and would not be included.
+                </span>
+              ) : null}
+            </>
           ) : (
             <span className="text-content-secondary">Check the data against the source email, then send.</span>
           )}
@@ -534,9 +623,24 @@ export function StagePage() {
         </Notice>
       ) : null}
 
-      <div className="grid items-start gap-md xl:grid-cols-[minmax(320px,2fr)_3fr]">
-        <EmailPanel emailId={emailId} />
+      {/* P24H: email beside the sectors. P06H: the AMF is a third column from 2xl; below that
+          it sits under the email so the sectors keep their width. */}
+      <div
+        className={cn(
+          "grid items-start gap-md xl:grid-cols-[minmax(320px,2fr)_3fr]",
+          withAmf && "2xl:grid-cols-[minmax(240px,2fr)_minmax(0,4fr)_minmax(360px,3fr)]",
+        )}
+      >
+        <div className={cn("flex min-w-0 flex-col gap-md", withAmf && "2xl:contents")}>
+          <EmailPanel emailId={emailId} stickyFrom={withAmf ? "2xl" : "xl"} evidence={evidence} />
+          {withAmf ? (
+            <div className="min-w-0 2xl:order-last">
+              <AmfPanel flight={flight} />
+            </div>
+          ) : null}
+        </div>
         <div className="flex min-w-0 flex-col gap-md">
+          <ReviewItems items={stage.review_items} onChanged={refresh} onEvidence={setEvidence} />
           {stage.sectors.map((sector) => (
             <SectorCard
               key={sector.sector_nbr}
@@ -548,8 +652,6 @@ export function StagePage() {
               onSaved={refresh}
             />
           ))}
-          <ReviewItems items={stage.review_items} onChanged={refresh} />
-          {status === "P06H" ? <AmfPanel flight={flight} /> : null}
         </div>
       </div>
 

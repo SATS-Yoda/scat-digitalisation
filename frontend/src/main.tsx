@@ -6,7 +6,8 @@ import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import { Layout } from "./Layout";
-import { AirlineSettingsPage, ReturnFlightsPage } from "./pages/Admin";
+import { AdminSettingsPage, AirlineSettingsPage, ReturnFlightsPage } from "./pages/Admin";
+import { AuditPage } from "./pages/Audit";
 import { DashboardPage } from "./pages/Dashboard";
 import { StagePage } from "./pages/Stage";
 
@@ -20,6 +21,8 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <DashboardPage /> },
       { path: "/flights/:airline/:fltNbr/:actdate/:status", element: <StagePage /> },
+      { path: "/audit", element: <AuditPage /> },
+      { path: "/admin", element: <AdminSettingsPage /> },
       { path: "/admin/return-flights", element: <ReturnFlightsPage /> },
       { path: "/admin/airline-settings", element: <AirlineSettingsPage /> },
     ],

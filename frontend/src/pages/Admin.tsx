@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftRight, Ban, CheckCircle2, Plus, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Ban, CheckCircle2, Plus, SlidersHorizontal } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { Card, EmptyState, ErrorState, Notice, Pill, SkeletonRows } from "@/components/common";
 import { Button } from "@/components/ui/button";
@@ -13,9 +14,51 @@ const code = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "");
 function PageHeader({ title, children }: { title: string; children: ReactNode }) {
   return (
     <header className="flex flex-col gap-xxs">
+      <Link to="/admin" className="flex min-h-[44px] w-fit items-center gap-xs text-sm font-medium link">
+        <ArrowLeft className="size-4" strokeWidth={1.75} aria-hidden /> Admin settings
+      </Link>
       <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="max-w-3xl text-sm text-content-muted">{children}</p>
     </header>
+  );
+}
+
+const SETTINGS = [
+  {
+    to: "/admin/return-flights",
+    icon: ArrowLeftRight,
+    title: "Return flight mapping",
+    text: "Which return flight is sent inside each outbound flight's files, and how many days later it departs.",
+  },
+  {
+    to: "/admin/airline-settings",
+    icon: SlidersHorizontal,
+    title: "Airline auto-release settings",
+    text: "Whether each airline's stages are sent to SAP automatically, and how long to hold them first.",
+  },
+];
+
+export function AdminSettingsPage() {
+  return (
+    <>
+      <header className="flex flex-col gap-xxs">
+        <h1 className="text-2xl font-semibold">Admin settings</h1>
+        <p className="max-w-3xl text-sm text-content-muted">Choose which setting to change.</p>
+      </header>
+      <div className="grid gap-md md:grid-cols-2">
+        {SETTINGS.map(({ to, icon: Icon, title, text }) => (
+          <Link key={to} to={to} className="block rounded-lg hover:bg-surface-hover">
+            <Card className="flex h-full flex-col gap-xs">
+              <span className="flex items-center gap-xs text-md font-semibold">
+                <Icon className="size-5" strokeWidth={1.75} aria-hidden />
+                {title}
+              </span>
+              <span className="text-sm text-content-secondary">{text}</span>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </>
   );
 }
 

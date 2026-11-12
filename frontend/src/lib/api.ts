@@ -85,6 +85,8 @@ export interface ReviewItem {
   email_id: number | null;
   sector_nbr: number | null;
   field_name: string | null;
+  text_start: number | null;
+  text_end: number | null;
   text_snippet: string | null;
   message: string;
   created_at: string;
@@ -187,6 +189,31 @@ export interface AirlineSetting {
   updated_at?: string;
 }
 
+export type AuditAction =
+  | "EXTRACTED"
+  | "EDITED"
+  | "REVIEWED_OK"
+  | "REVIEW_ITEM_RESOLVED"
+  | "NOT_RELEASED"
+  | "SENDING"
+  | "SENT"
+  | "FAILED";
+
+export interface AuditEvent extends FlightRef {
+  at: string;
+  actor: string;
+  action: AuditAction;
+  status: Status | null;
+  sector_nbr: number | null;
+  detail: string | null;
+}
+
+export interface AuditFilters {
+  date_from?: string;
+  date_to?: string;
+  airline?: string;
+}
+
 export interface FlightFilters {
   date_from?: string;
   date_to?: string;
@@ -252,6 +279,12 @@ export const api = {
     request<VersionDetail>(`${stagePath(f, status)}/sectors/${sector}/versions/${version}`),
   amf: (f: FlightRef) => request<Amf[]>(`/api/flights/${f.airline}/${f.flt_nbr}/${f.actdate}/amf`),
   email: (id: number) => request<Email>(`/api/emails/${id}`),
+  audit: (filters: AuditFilters) => {
+    const params = new URLSearchParams(
+      Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])),
+    );
+    return request<AuditEvent[]>(`/api/audit?${params}`);
+  },
 
   saveSector: (f: FlightRef, status: Status, sector: number, edit: SectorEdit) =>
     send<SaveResult>("PUT", `${stagePath(f, status)}/sectors/${sector}`, edit),

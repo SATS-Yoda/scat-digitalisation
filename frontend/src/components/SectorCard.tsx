@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -77,6 +77,23 @@ function toForm(sector: SectorDetail): FormValues {
 }
 
 const slotLabel = (slot: string) => slot.toUpperCase().replace("_", " ");
+
+const SLOT_GROUPS: [string, string[]][] = [
+  ["First", ["p"]],
+  ["Business", ["jm", "ju", "jf", "ja"]],
+  ["Premium economy", ["sm", "su", "sf", "sa"]],
+  ["Economy", ["yu", "yf", "ya", "y"]],
+  ["Crew", ["staff_p", "staff_j", "staff_s", "staff_y"]],
+];
+
+/** The slots grouped by cabin. A slot the groups do not know still gets a field. */
+function slotGroups(slots: string[]): [string, string[]][] {
+  const known = new Set(SLOT_GROUPS.flatMap(([, g]) => g));
+  const groups = SLOT_GROUPS.map(([name, g]): [string, string[]] => [name, g.filter((x) => slots.includes(x))]);
+  const other = slots.filter((x) => !known.has(x));
+  if (other.length) groups.push(["Other", other]);
+  return groups.filter(([, g]) => g.length > 0);
+}
 
 function ClassesTable({ classes }: { classes: ClassCount[] }) {
   const filled = classes.filter((c) => c.pax !== null);
@@ -306,36 +323,46 @@ export function SectorCard({
             <div className="flex flex-col gap-xs">
               <h4 className="text-sm font-semibold">Pax by class (I033)</h4>
               <p className="text-xs text-content-muted">Each class slot takes a class code and a pax count</p>
-              {/* A grid of small field groups: 17 slots in a table would be 17 tall rows. */}
-              <div className="grid gap-x-lg gap-y-xs sm:grid-cols-2 2xl:grid-cols-3">
-                {form.getValues("classes").map((c, i) => (
-                  <div key={c.slot}>
-                    <div className="flex items-center gap-xs">
-                      <span className="num w-[72px] shrink-0 text-xs font-semibold text-content-secondary">
-                        {slotLabel(c.slot)}
-                      </span>
-                      <Input
-                        aria-label={`${slotLabel(c.slot)} class code`}
-                        aria-invalid={Boolean(errors.classes?.[i]?.code)}
-                        aria-describedby={`s${n}-c${i}-code`}
-                        placeholder="Code"
-                        className="num w-[72px] uppercase placeholder:normal-case"
-                        maxLength={3}
-                        {...form.register(`classes.${i}.code`)}
-                      />
-                      <Input
-                        aria-label={`${slotLabel(c.slot)} pax`}
-                        aria-invalid={Boolean(errors.classes?.[i]?.pax)}
-                        aria-describedby={`s${n}-c${i}-pax`}
-                        placeholder="Pax"
-                        inputMode="numeric"
-                        className="num w-[88px]"
-                        {...form.register(`classes.${i}.pax`)}
-                      />
+              {/* One block per cabin, so the slots line up in short columns instead of one
+                  wide grid that overflows its cell. */}
+              <div className="grid items-start gap-md sm:grid-cols-2">
+                {slotGroups(form.getValues("classes").map((c) => c.slot)).map(([name, slots]) => (
+                  <fieldset key={name} className="flex min-w-0 flex-col gap-xs rounded-md border p-sm">
+                    <legend className="px-xxs text-xs font-semibold text-content-secondary">{name}</legend>
+                    <div className="grid grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-xs gap-y-xs">
+                      <span className="text-xs text-content-muted">Slot</span>
+                      <span className="text-xs text-content-muted">Code</span>
+                      <span className="text-xs text-content-muted">Pax</span>
+                      {slots.map((slot) => {
+                        const i = form.getValues("classes").findIndex((c) => c.slot === slot);
+                        return (
+                          <Fragment key={slot}>
+                            <span className="num text-xs font-semibold text-content-secondary">{slotLabel(slot)}</span>
+                            <Input
+                              aria-label={`${slotLabel(slot)} class code`}
+                              aria-invalid={Boolean(errors.classes?.[i]?.code)}
+                              aria-describedby={`s${n}-c${i}-code`}
+                              className="num w-full uppercase"
+                              maxLength={3}
+                              {...form.register(`classes.${i}.code`)}
+                            />
+                            <Input
+                              aria-label={`${slotLabel(slot)} pax`}
+                              aria-invalid={Boolean(errors.classes?.[i]?.pax)}
+                              aria-describedby={`s${n}-c${i}-pax`}
+                              inputMode="numeric"
+                              className="num w-full"
+                              {...form.register(`classes.${i}.pax`)}
+                            />
+                            <div className="col-span-3 empty:hidden">
+                              <FieldError id={`s${n}-c${i}-code`} message={errors.classes?.[i]?.code?.message} />
+                              <FieldError id={`s${n}-c${i}-pax`} message={errors.classes?.[i]?.pax?.message} />
+                            </div>
+                          </Fragment>
+                        );
+                      })}
                     </div>
-                    <FieldError id={`s${n}-c${i}-code`} message={errors.classes?.[i]?.code?.message} />
-                    <FieldError id={`s${n}-c${i}-pax`} message={errors.classes?.[i]?.pax?.message} />
-                  </div>
+                  </fieldset>
                 ))}
               </div>
             </div>
