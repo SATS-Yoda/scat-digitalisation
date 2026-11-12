@@ -3,13 +3,25 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select, text
 from sqlalchemy.engine import Connection, Engine
 
 from . import commands, queries, schemas
 from . import tables as t
-from .auth import Forbidden, User, current_user
+from .auth import (
+    SESSION_COOKIE,
+    AuthConfig,
+    Forbidden,
+    IdentityError,
+    Unauthenticated,
+    User,
+    current_user,
+    require_admin,
+    require_plant,
+    start_session,
+    user_from_identity,
+)
 from .dify import SapSendResult
 
 Airline = Annotated[str, Path(pattern=r"^[A-Z0-9]{2,3}$")]
@@ -22,11 +34,15 @@ _ERRORS = {
     commands.Conflict: 409,
     commands.Invalid: 422,
     Forbidden: 403,
+    Unauthenticated: 401,
 }
 
 
-def create_app(engine: Engine, sap_sender: SapSender | None = None) -> FastAPI:
+def create_app(
+    engine: Engine, sap_sender: SapSender | None = None, auth: AuthConfig | None = None
+) -> FastAPI:
     app = FastAPI(title="Meal request console API")
+    app.state.auth = auth
 
     for exc_type, code in _ERRORS.items():
 
@@ -57,22 +73,80 @@ def create_app(engine: Engine, sap_sender: SapSender | None = None) -> FastAPI:
         conn.execute(text("SELECT 1"))
         return {"status": "ready"}
 
+    # --- Sign-in -------------------------------------------------------------------------
+
+    if auth is not None:
+
+        @app.get("/auth/login")
+        def login() -> RedirectResponse:
+            url, flow = auth.provider.begin()
+            auth.store.put(f"flow:{flow['state']}", flow, 600)
+            return RedirectResponse(url)
+
+        @app.get("/auth/callback")
+        def callback(request: Request) -> RedirectResponse:
+            params = dict(request.query_params)
+            flow = auth.store.pop(f"flow:{params.get('state', '')}")
+            if flow is None:
+                raise Unauthenticated("Sign-in expired or unknown; start again")
+            try:
+                identity = auth.provider.complete(flow, params)
+            except IdentityError as exc:
+                raise Unauthenticated(f"Sign-in refused: {exc}") from exc
+            user = user_from_identity(identity, auth.groups)
+            if not user.plants and not user.is_admin:
+                raise Forbidden("This account is not in any console group")
+            session_id, _ = start_session(auth, user)
+            response = RedirectResponse("/")
+            response.set_cookie(
+                SESSION_COOKIE,
+                session_id,
+                max_age=auth.session_ttl_s,
+                httponly=True,
+                secure=auth.secure_cookie,
+                samesite="lax",
+            )
+            return response
+
+        @app.post("/auth/logout", status_code=204)
+        def logout(request: Request, me: Me) -> JSONResponse:
+            auth.store.delete(f"session:{request.cookies.get(SESSION_COOKIE)}")
+            response = JSONResponse(None, status_code=204)
+            response.delete_cookie(SESSION_COOKIE)
+            return response
+
+    @app.get("/api/me")
+    def me_(request: Request, me: Me) -> dict:
+        data = {"id": me.id, "plants": sorted(me.plants), "is_admin": me.is_admin}
+        if auth is not None:
+            session = auth.store.get(f"session:{request.cookies.get(SESSION_COOKIE)}")
+            data["csrf_token"] = session["csrf"] if session else None
+        return data
+
     # --- Read ----------------------------------------------------------------------------
 
     @app.get("/api/flights", response_model=list[schemas.FlightSummary])
     def list_flights(
         conn: Conn,
+        me: Me,
         date_from: date | None = None,
         date_to: date | None = None,
         airline: Annotated[str | None, Query(pattern=r"^[A-Z0-9]{2,3}$")] = None,
         plant: schemas.Plant | None = None,
     ):
-        return queries.list_flights(conn, date_from, date_to, airline, plant)
+        flights = queries.list_flights(conn, date_from, date_to, airline, plant)
+        return [f for f in flights if f["plant"] in me.plants]
 
     @app.get(_STAGE, response_model=schemas.StageDetail)
     def get_stage(
-        conn: Conn, airline: Airline, flt_nbr: FltNbr, actdate: date, status: schemas.Status
+        conn: Conn,
+        me: Me,
+        airline: Airline,
+        flt_nbr: FltNbr,
+        actdate: date,
+        status: schemas.Status,
     ):
+        require_plant(me, airline)
         stage = queries.get_stage(conn, airline, flt_nbr, actdate, status)
         if stage is None:
             raise HTTPException(404, f"No {status} data for {airline} {flt_nbr} on {actdate}")
@@ -84,6 +158,7 @@ def create_app(engine: Engine, sap_sender: SapSender | None = None) -> FastAPI:
     )
     def get_version(
         conn: Conn,
+        me: Me,
         airline: Airline,
         flt_nbr: FltNbr,
         actdate: date,
@@ -91,6 +166,7 @@ def create_app(engine: Engine, sap_sender: SapSender | None = None) -> FastAPI:
         sector_nbr: int,
         version_no: int,
     ):
+        require_plant(me, airline)
         version = queries.get_version(
             conn, airline, flt_nbr, actdate, status, sector_nbr, version_no
         )
@@ -103,15 +179,29 @@ def create_app(engine: Engine, sap_sender: SapSender | None = None) -> FastAPI:
         return version
 
     @app.get("/api/flights/{airline}/{flt_nbr}/{actdate}/amf", response_model=list[schemas.Amf])
-    def get_amf(conn: Conn, airline: Airline, flt_nbr: FltNbr, actdate: date):
+    def get_amf(conn: Conn, me: Me, airline: Airline, flt_nbr: FltNbr, actdate: date):
+        require_plant(me, airline)
         return queries.get_amf(conn, airline, flt_nbr, actdate)
 
     @app.get("/api/emails/{email_id}", response_model=schemas.Email)
-    def get_email(conn: Conn, email_id: int):
+    def get_email(conn: Conn, me: Me, email_id: int):
         email = queries.get_email(conn, email_id)
         if email is None:
             raise HTTPException(404, f"No email with id {email_id}")
+        if email["airline"]:  # an email not yet matched to an airline has no plant to check
+            require_plant(me, email["airline"])
         return email
+
+    @app.get("/api/audit", response_model=list[schemas.AuditEvent])
+    def audit(
+        conn: Conn,
+        me: Me,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        airline: Annotated[str | None, Query(pattern=r"^[A-Z0-9]{2,3}$")] = None,
+        limit: Annotated[int, Query(ge=1, le=500)] = 200,
+    ):
+        return queries.audit_events(conn, me.plants, date_from, date_to, airline, limit)
 
     # --- Write ---------------------------------------------------------------------------
 
@@ -164,7 +254,8 @@ def create_app(engine: Engine, sap_sender: SapSender | None = None) -> FastAPI:
     # --- Admin ---------------------------------------------------------------------------
 
     @app.get("/api/admin/return-flights", response_model=list[schemas.ReturnFlight])
-    def list_return_flights(conn: Conn):
+    def list_return_flights(conn: Conn, me: Me):
+        require_admin(me)
         m = t.return_map.c
         rows = conn.execute(
             select(t.return_map).order_by(m.airline, m.outbound_flt_nbr, m.return_flt_nbr)
@@ -180,7 +271,8 @@ def create_app(engine: Engine, sap_sender: SapSender | None = None) -> FastAPI:
         )
 
     @app.get("/api/admin/airline-settings", response_model=list[schemas.AirlineSetting])
-    def list_airline_settings(conn: Conn):
+    def list_airline_settings(conn: Conn, me: Me):
+        require_admin(me)
         rows = conn.execute(select(t.airline_config).order_by(t.airline_config.c.airline))
         return rows.mappings().all()
 

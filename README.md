@@ -77,6 +77,7 @@ settings. Design tokens and fonts are vendored unchanged in `frontend/src/styles
 | `GET {stage}/sectors/{sector_nbr}/versions/{version_no}` | One stored version |
 | `GET /api/flights/{airline}/{flt_nbr}/{actdate}/amf` | Current AMF per sector with lines |
 | `GET /api/emails/{email_id}` | Email metadata and `body_preview` |
+| `GET /api/audit` | Who extracted, edited, reviewed, resolved and sent what, newest first. Filters `airline`, `date_from`, `date_to` (flight date), `limit` (max 500). Scoped to the user's plants |
 | `PUT {stage}/sectors/{sector_nbr}` | Saves an edit as a new version and regenerates the AMF |
 | `POST {stage}/review` | Marks the current versions as reviewed without changes |
 | `POST {stage}/send` | Sends the outbound flight and its return flight to SAP through Dify |
@@ -99,9 +100,12 @@ send can be retried and reuses its file number.
   into a migration for shared environments.
 - **One table added to the draft SQL:** `scatdd_i033_review_test`, for the "Reviewed OK"
   button. Marked as proposed in the file.
-- **No sign-in yet.** Every endpoint is open and acts as a fixed development user with both
-  plants (`backend/app/auth.py`) until step 5. Do not deploy to a shared environment before
-  then.
+- **Sign-in is built but has never run against Entra or Redis.** Sessions, CSRF,
+  group-to-plant mapping and plant-scoped reads are in `backend/app/auth.py`; the MSAL and
+  Redis adapters are in `backend/app/adapters.py`. Tests use a fake provider and stubs. Set
+  the `ENTRA_*` and `REDIS_URL` values (see `backend/.env.example`) for real sign-in; with
+  none set, the server starts only with `AUTH_DEV_MODE=true`, a fixed admin with no sign-in.
+  The frontend does not send the CSRF token yet, so browser writes fail under real sign-in.
 - **Dify output shape is unconfirmed.** `backend/app/dify.py` reads the shape proposed in
   the handover. Tests use a fake workflow; the real one has not been called.
 - **A send interrupted by a process crash stays `SENDING`** and needs a manual reset until a

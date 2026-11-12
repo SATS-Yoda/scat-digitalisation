@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import String, and_, case, cast, false, func, or_, select
 from sqlalchemy.engine import Connection, RowMapping
 
 from . import tables as t
@@ -473,3 +473,113 @@ def get_email(conn: Connection, email_id: int):
         .first()
     )
     return dict(row) if row else None
+
+
+def _plant_condition(airline_col, plants: frozenset[str]):
+    """Rows of the airlines belonging to these plants (SQ is ICC1, all others ICC2)."""
+    conditions = []
+    if "ICC1" in plants:
+        conditions.append(airline_col == "SQ")
+    if "ICC2" in plants:
+        conditions.append(airline_col != "SQ")
+    return or_(*conditions) if conditions else false()
+
+
+def audit_events(
+    conn: Connection,
+    plants: frozenset[str],
+    date_from: date | None,
+    date_to: date | None,
+    airline: str | None,
+    limit: int,
+) -> list[dict]:
+    """Who did what to which flight, newest first, from the records the console already
+    keeps: I033 versions, reviewed-OK marks, resolved review items and send decisions.
+    Return flight and airline setting changes keep only their latest editor, so they are
+    not part of this trail."""
+    events: list[dict] = []
+
+    def scope(c):
+        parts = [_plant_condition(c.airline, plants)]
+        if date_from:
+            parts.append(c.actdate >= date_from)
+        if date_to:
+            parts.append(c.actdate <= date_to)
+        if airline:
+            parts.append(c.airline == airline)
+        return and_(*parts)
+
+    def add(rows, **fixed):
+        events.extend({**fixed, **row} for row in rows)
+
+    v = t.i033.c
+    versions = conn.execute(
+        select(
+            v.created_at.label("at"),
+            v.created_by.label("actor"),
+            case((v.created_source == "USER", "EDITED"), else_="EXTRACTED").label("action"),
+            v.airline, v.flt_nbr, v.actdate, v.status, v.sector_nbr,
+            ("Version " + cast(v.version_no, String)).label("detail"),
+        )
+        .where(scope(v))
+        .order_by(v.created_at.desc())
+        .limit(limit)
+    )  # fmt: skip
+    add(versions.mappings())
+
+    r = t.i033_review.c
+    reviewed = conn.execute(
+        select(
+            r.reviewed_at.label("at"),
+            r.reviewed_by.label("actor"),
+            v.airline, v.flt_nbr, v.actdate, v.status, v.sector_nbr,
+            ("Version " + cast(v.version_no, String)).label("detail"),
+        )
+        .join(t.i033, t.i033.c.i033_id == r.i033_id)
+        .where(scope(v))
+        .order_by(r.reviewed_at.desc())
+        .limit(limit)
+    )  # fmt: skip
+    add(reviewed.mappings(), action="REVIEWED_OK")
+
+    i = t.review_item.c
+    resolved = conn.execute(
+        select(
+            i.resolved_at.label("at"),
+            func.coalesce(i.resolved_by, "system").label("actor"),
+            i.airline, i.flt_nbr, i.actdate, i.status, i.sector_nbr,
+            (
+                i.error_code + ": " + func.coalesce(i.resolution_type, i.state)
+                + func.coalesce(", " + i.resolution_remarks, "")
+            ).label("detail"),
+        )
+        .where(i.resolved_at.is_not(None), i.airline.is_not(None), scope(i))
+        .order_by(i.resolved_at.desc())
+        .limit(limit)
+    )  # fmt: skip
+    add(resolved.mappings(), action="REVIEW_ITEM_RESOLVED")
+
+    s = t.sap_send.c
+    sends = conn.execute(
+        select(
+            s.decided_at.label("at"),
+            s.decided_by.label("actor"),
+            s.state.label("action"),
+            s.airline, s.flt_nbr, s.actdate, s.status,
+            case(
+                (s.failure_reason.is_not(None), s.failure_reason),
+                (
+                    s.i033_file_name.is_not(None),
+                    s.i033_file_name + func.coalesce(", " + s.i034_file_name, ""),
+                ),
+                else_=None,
+            ).label("detail"),
+        )
+        .where(scope(s))
+        .order_by(s.decided_at.desc())
+        .limit(limit)
+    )  # fmt: skip
+    add(sends.mappings(), sector_nbr=None)
+
+    events.sort(key=lambda e: e["at"], reverse=True)
+    return events[:limit]

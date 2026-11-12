@@ -318,3 +318,16 @@ def test_airline_settings(client):
     [row] = client.get(url).json()
     assert (row["airline"], row["auto_release"], row["auto_release_hold_min"]) == ("QR", True, 30)
     assert client.put(f"{url}/QR", json={**body, "auto_release_hold_min": -1}).status_code == 422
+
+
+def test_edit_and_review_appear_in_the_audit_trail(client):
+    save(client, QR943_P24H, 1, [meal("MOML", 9)], sector=2)
+    client.post(f"{QR943_P24H}/review")
+    resolved = [
+        e
+        for e in client.get("/api/audit", params={"airline": "QR"}).json()
+        if e["actor"] == "dev-user"
+    ]
+    assert {e["action"] for e in resolved} >= {"EDITED", "REVIEWED_OK"}
+    edit = next(e for e in resolved if e["action"] == "EDITED")
+    assert (edit["status"], edit["sector_nbr"]) == ("P24H", 2)

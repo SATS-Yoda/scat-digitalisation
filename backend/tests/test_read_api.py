@@ -132,3 +132,21 @@ def test_email(client):
     assert email["subject"] == "SQ856-13NOV-FINAL"
     assert "raw_record" not in email
     assert client.get("/api/emails/99").status_code == 404
+
+
+def test_audit_trail_lists_who_did_what_newest_first(client):
+    events = client.get("/api/audit").json()
+    assert events
+    assert [e["at"] for e in events] == sorted((e["at"] for e in events), reverse=True)
+    actions = {e["action"] for e in events}
+    assert {"EXTRACTED", "SENT"} <= actions
+    sent = next(e for e in events if e["action"] == "SENT")
+    assert sent["actor"] and (sent["airline"], sent["flt_nbr"]) == ("SQ", "856")
+
+
+def test_audit_trail_filters_and_limits(client):
+    qr = client.get("/api/audit", params={"airline": "QR"}).json()
+    assert qr and {e["airline"] for e in qr} == {"QR"}
+    assert len(client.get("/api/audit", params={"limit": 2}).json()) == 2
+    assert client.get("/api/audit", params={"limit": 501}).status_code == 422
+    assert client.get("/api/audit", params={"date_from": "2030-01-01"}).json() == []

@@ -176,6 +176,21 @@ class Email(BaseModel):
     body_preview: str | None
 
 
+class AuditEvent(BaseModel):
+    at: datetime
+    actor: str
+    action: Literal[
+        "EXTRACTED", "EDITED", "REVIEWED_OK", "REVIEW_ITEM_RESOLVED",
+        "NOT_RELEASED", "SENDING", "SENT", "FAILED",
+    ]  # fmt: skip
+    airline: str
+    flt_nbr: str
+    actdate: date
+    status: Status | None
+    sector_nbr: int | None
+    detail: str | None
+
+
 # --- Requests and results of the write side ---------------------------------------------
 
 
