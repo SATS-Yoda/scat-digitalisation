@@ -1,0 +1,905 @@
+[
+ {
+  "table_name": "scatdd_amf_line_test",
+  "column_name": "amf_line_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_line_test",
+  "column_name": "amf_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_line_test",
+  "column_name": "line_type",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_line_test",
+  "column_name": "cabin",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_line_test",
+  "column_name": "source_class",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_line_test",
+  "column_name": "meal_type",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_line_test",
+  "column_name": "pax_p06h",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_line_test",
+  "column_name": "spml_id",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_line_test",
+  "column_name": "delta_qty",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "amf_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "airline",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "flt_nbr",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "actdate",
+  "data_type": "date",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "sector_nbr",
+  "data_type": "smallint",
+  "is_nullable": "NO",
+  "column_default": "1"
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "p24h_i033_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "p06h_i033_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "amf_version",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": "1"
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "is_current",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+ },
+ {
+  "table_name": "scatdd_amf_test",
+  "column_name": "generated_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "email_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "message_id",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "eml_uri",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "text_uri",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "content_sha256",
+  "data_type": "character",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "sender",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "subject",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "received_at_raw",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "received_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "body_preview",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "airline",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "detected_status",
+  "data_type": "character",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "confidence",
+  "data_type": "numeric",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "pipeline_status",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": "'RECEIVED'::character varying"
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "rejection_reason",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "raw_record",
+  "data_type": "jsonb",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "extracted_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "inserted_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+ },
+ {
+  "table_name": "scatdd_email_test",
+  "column_name": "updated_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+ },
+ {
+  "table_name": "scatdd_error_type_test",
+  "column_name": "error_code",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_error_type_test",
+  "column_name": "description",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_error_type_test",
+  "column_name": "severity",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_error_type_test",
+  "column_name": "blocks_release",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+ },
+ {
+  "table_name": "scatdd_error_type_test",
+  "column_name": "message_template",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_error_type_test",
+  "column_name": "is_active",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "i033_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "record_type",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": "'10'::character varying"
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "airline",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "flt_nbr",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "actdate",
+  "data_type": "date",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "sector_nbr",
+  "data_type": "smallint",
+  "is_nullable": "NO",
+  "column_default": "1"
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "status",
+  "data_type": "character",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "p",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_p",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "jm",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_jm",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "ju",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_ju",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "jf",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_jf",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "ja",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_ja",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "sm",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_sm",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "su",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_su",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "sf",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_sf",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "sa",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_sa",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "yu",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_yu",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "yf",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_yf",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "ya",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_ya",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "y",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_y",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "staff_p",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_staff_p",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "staff_j",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_staff_j",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "staff_s",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_staff_s",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "staff_y",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "pax_staff_y",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "version_no",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": "1"
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "is_current",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "true"
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "created_source",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": "'SYSTEM'::character varying"
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "is_ex_sector",
+  "data_type": "boolean",
+  "is_nullable": "NO",
+  "column_default": "false"
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "source_email_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "created_by",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+ },
+ {
+  "table_name": "scatdd_i033_test",
+  "column_name": "sent_to_sap_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "i034_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "record_type",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": "'10'::character varying"
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "airln",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "fltnr",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "acdate",
+  "data_type": "date",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "secnr",
+  "data_type": "smallint",
+  "is_nullable": "NO",
+  "column_default": "1"
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "status",
+  "data_type": "character",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "class",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "meal_type",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "spml_id",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "qnty",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "pname",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "meal_nr",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "txt",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_i034_test",
+  "column_name": "version_no",
+  "data_type": "integer",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "review_item_id",
+  "data_type": "bigint",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "error_code",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "email_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "airline",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "flt_nbr",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "actdate",
+  "data_type": "date",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "sector_nbr",
+  "data_type": "smallint",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "status",
+  "data_type": "character",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "i033_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "i034_id",
+  "data_type": "bigint",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "field_name",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "text_start",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "text_end",
+  "data_type": "integer",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "text_snippet",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "message",
+  "data_type": "text",
+  "is_nullable": "NO",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "state",
+  "data_type": "character varying",
+  "is_nullable": "NO",
+  "column_default": "'OPEN'::character varying"
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "resolution_type",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "resolution_remarks",
+  "data_type": "text",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "resolved_by",
+  "data_type": "character varying",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "resolved_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "YES",
+  "column_default": null
+ },
+ {
+  "table_name": "scatdd_review_item_test",
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone",
+  "is_nullable": "NO",
+  "column_default": "now()"
+ }
+]

@@ -1,0 +1,437 @@
+"""Read-side queries. Each function takes an open connection and returns plain dicts."""
+
+from datetime import date, timedelta
+
+from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy.engine import Connection, RowMapping
+
+from . import tables as t
+
+STATUSES = ("P24H", "P06H")
+
+
+def plant_for(airline: str) -> str:
+    return "ICC1" if airline == "SQ" else "ICC2"
+
+
+def stage_state(has_data: bool, sent_at: object, send_state: str | None) -> str:
+    """Dashboard state of one flight stage. `sent_to_sap_at` wins: sent is final."""
+    if sent_at is not None or send_state == "SENT":
+        return "SENT"
+    if send_state:
+        return send_state
+    return "PENDING" if has_data else "NO_DATA"
+
+
+def _return_maps(conn: Connection) -> tuple[dict, dict]:
+    rows = conn.execute(select(t.return_map).where(t.return_map.c.is_active)).mappings().all()
+    # ceiling: one return flight per outbound flight, as the handover describes. The table's
+    # key would allow several; the last one read wins here.
+    by_outbound = {(r["airline"], r["outbound_flt_nbr"]): r for r in rows}
+    by_return = {(r["airline"], r["return_flt_nbr"]): r for r in rows}
+    return by_outbound, by_return
+
+
+def _outbound_of(by_return: dict, airline: str, flt_nbr: str, actdate: date) -> dict | None:
+    m = by_return.get((airline, flt_nbr))
+    if m is None:
+        return None
+    return {
+        "airline": airline,
+        "flt_nbr": m["outbound_flt_nbr"],
+        "actdate": actdate - timedelta(days=m["day_offset"]),
+    }
+
+
+def _return_of(by_outbound: dict, airline: str, flt_nbr: str, actdate: date) -> dict | None:
+    m = by_outbound.get((airline, flt_nbr))
+    if m is None:
+        return None
+    return {
+        "airline": airline,
+        "flt_nbr": m["return_flt_nbr"],
+        "actdate": actdate + timedelta(days=m["day_offset"]),
+    }
+
+
+def list_flights(
+    conn: Connection,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    airline: str | None = None,
+    plant: str | None = None,
+) -> list[dict]:
+    """Outbound flights in date order, each with its return flight nested under it.
+
+    The date range applies to the outbound flight; a return flight on a later day still
+    comes back under its outbound flight.
+    """
+    by_outbound, by_return = _return_maps(conn)
+    pad = timedelta(days=max((abs(m["day_offset"]) for m in by_outbound.values()), default=0))
+
+    def scope(airline_col, date_col) -> list:
+        conds = []
+        if date_from:
+            conds.append(date_col >= date_from - pad)
+        if date_to:
+            conds.append(date_col <= date_to + pad)
+        if airline:
+            conds.append(airline_col == airline)
+        if plant == "ICC1":
+            conds.append(airline_col == "SQ")
+        elif plant == "ICC2":
+            conds.append(airline_col != "SQ")
+        return conds
+
+    i = t.i033.c
+    data_rows = conn.execute(
+        select(
+            i.airline,
+            i.flt_nbr,
+            i.actdate,
+            i.status,
+            func.sum(case((i.is_current, 1), else_=0)).label("sectors"),
+            # Over every version, not only the current one: a stage stays locked even if a
+            # later email produced a newer unsent version.
+            func.max(i.sent_to_sap_at).label("sent_at"),
+            func.max(case((i.is_current, i.created_at))).label("updated_at"),
+        )
+        .where(*scope(i.airline, i.actdate))
+        .group_by(i.airline, i.flt_nbr, i.actdate, i.status)
+    ).mappings()
+    data = {(r["airline"], r["flt_nbr"], r["actdate"], r["status"].rstrip()): r for r in data_rows}
+
+    r, e = t.review_item.c, t.error_type.c
+    review_rows = conn.execute(
+        select(
+            r.airline,
+            r.flt_nbr,
+            r.actdate,
+            r.status,
+            func.count().label("open"),
+            func.sum(case((e.blocks_release, 1), else_=0)).label("blocking"),
+        )
+        .join_from(t.review_item, t.error_type, r.error_code == e.error_code)
+        .where(
+            r.state == "OPEN",
+            r.airline.is_not(None),
+            r.flt_nbr.is_not(None),
+            r.actdate.is_not(None),
+            *scope(r.airline, r.actdate),
+        )
+        .group_by(r.airline, r.flt_nbr, r.actdate, r.status)
+    ).mappings()
+    reviews = {
+        (x["airline"], x["flt_nbr"], x["actdate"], x["status"] and x["status"].rstrip()): x
+        for x in review_rows
+    }
+
+    s = t.sap_send.c
+    send_rows = conn.execute(select(t.sap_send).where(*scope(s.airline, s.actdate))).mappings()
+    sends = {(x["airline"], x["flt_nbr"], x["actdate"], x["status"].rstrip()): x for x in send_rows}
+
+    def stages(flight: tuple, send_flight: tuple) -> list[dict]:
+        out = []
+        for status in STATUSES:
+            row = data.get((*flight, status))
+            send = sends.get((*send_flight, status))
+            # A review item with no status applies to both stages of the flight.
+            counts = [reviews[k] for k in ((*flight, status), (*flight, None)) if k in reviews]
+            sent_at = row["sent_at"] if row else None
+            out.append(
+                {
+                    "status": status,
+                    "state": stage_state(row is not None, sent_at, send and send["state"]),
+                    "sectors": row["sectors"] if row else 0,
+                    "open_review_items": sum(c["open"] for c in counts),
+                    "blocking_review_items": sum(c["blocking"] for c in counts),
+                    "sent_at": sent_at,
+                    "updated_at": row["updated_at"] if row else None,
+                    "send_error": send["failure_reason"] if send else None,
+                }
+            )
+        return out
+
+    # Flights with extracted data or with open review items (an email can fail extraction
+    # and leave only a review item), folded onto their outbound flight.
+    outbound_flights = set()
+    for airline_, flt_nbr, actdate, _ in [*data, *reviews]:
+        ob = _outbound_of(by_return, airline_, flt_nbr, actdate)
+        outbound_flights.add(tuple(ob.values()) if ob else (airline_, flt_nbr, actdate))
+
+    result = []
+    for flight in sorted(outbound_flights, key=lambda f: (f[2], f[0], f[1])):
+        airline_, flt_nbr, actdate = flight
+        if (date_from and actdate < date_from) or (date_to and actdate > date_to):
+            continue
+        ret = _return_of(by_outbound, *flight)
+        if ret:
+            ret["stages"] = stages(tuple(ret.values()), flight)
+        result.append(
+            {
+                "airline": airline_,
+                "flt_nbr": flt_nbr,
+                "actdate": actdate,
+                "plant": plant_for(airline_),
+                "stages": stages(flight, flight),
+                "return_flight": ret,
+            }
+        )
+    return result
+
+
+def _i033_out(row: RowMapping) -> dict:
+    out = {
+        k: row[k]
+        for k in (
+            "i033_id",
+            "sector_nbr",
+            "version_no",
+            "is_current",
+            "created_source",
+            "created_by",
+            "created_at",
+            "source_email_id",
+            "is_ex_sector",
+            "sent_to_sap_at",
+        )
+    }
+    out["classes"] = [{"slot": s, "code": row[s], "pax": row[f"pax_{s}"]} for s in t.CLASS_SLOTS]
+    return out
+
+
+def _i034_out(row: RowMapping) -> dict:
+    out = {
+        k: row[k] for k in ("i034_id", "meal_type", "spml_id", "qnty", "pname", "meal_nr", "txt")
+    }
+    out["sector_nbr"] = row["secnr"]
+    out["class_code"] = row["class"]
+    return out
+
+
+def _i034_rows(conn: Connection, airline, flt_nbr, actdate, status, versions: list[tuple]):
+    """I034 rows of the given (sector_nbr, version_no) pairs. I034 has no is_current."""
+    if not versions:
+        return []
+    m = t.i034.c
+    return (
+        conn.execute(
+            select(t.i034)
+            .where(
+                m.airln == airline,
+                m.fltnr == flt_nbr,
+                m.acdate == actdate,
+                m.status == status,
+                or_(*[and_(m.secnr == s, m.version_no == v) for s, v in versions]),
+            )
+            .order_by(m.secnr, m.i034_id)
+        )
+        .mappings()
+        .all()
+    )
+
+
+def get_stage(conn: Connection, airline: str, flt_nbr: str, actdate: date, status: str):
+    """Current I033 and I034, version history, open review items and send state of one
+    flight stage. None when the stage has no I033 rows."""
+    i = t.i033.c
+    rows = (
+        conn.execute(
+            select(t.i033)
+            .where(
+                i.airline == airline,
+                i.flt_nbr == flt_nbr,
+                i.actdate == actdate,
+                i.status == status,
+            )
+            .order_by(i.sector_nbr, i.version_no.desc())
+        )
+        .mappings()
+        .all()
+    )
+    if not rows:
+        return None
+
+    by_outbound, by_return = _return_maps(conn)
+    return_of = _outbound_of(by_return, airline, flt_nbr, actdate)
+    return_flight = _return_of(by_outbound, airline, flt_nbr, actdate)
+
+    # A return flight has no send of its own; it follows its outbound flight's send row.
+    unit = return_of or {"airline": airline, "flt_nbr": flt_nbr, "actdate": actdate}
+    s = t.sap_send.c
+    send = (
+        conn.execute(
+            select(t.sap_send).where(
+                s.airline == unit["airline"],
+                s.flt_nbr == unit["flt_nbr"],
+                s.actdate == unit["actdate"],
+                s.status == status,
+            )
+        )
+        .mappings()
+        .first()
+    )
+
+    current = [r for r in rows if r["is_current"]]
+    meals = _i034_rows(
+        conn,
+        airline,
+        flt_nbr,
+        actdate,
+        status,
+        [(r["sector_nbr"], r["version_no"]) for r in current],
+    )
+
+    r, e = t.review_item.c, t.error_type.c
+    review_items = (
+        conn.execute(
+            select(
+                r.review_item_id,
+                r.error_code,
+                e.severity,
+                e.blocks_release,
+                r.email_id,
+                r.sector_nbr,
+                r.i033_id,
+                r.i034_id,
+                r.field_name,
+                r.text_start,
+                r.text_end,
+                r.text_snippet,
+                r.message,
+                r.created_at,
+            )
+            .join_from(t.review_item, t.error_type, r.error_code == e.error_code)
+            .where(
+                r.state == "OPEN",
+                r.airline == airline,
+                r.flt_nbr == flt_nbr,
+                r.actdate == actdate,
+                or_(r.status == status, r.status.is_(None)),
+            )
+            .order_by(r.review_item_id)
+        )
+        .mappings()
+        .all()
+    )
+
+    sent_at = max((x["sent_to_sap_at"] for x in rows if x["sent_to_sap_at"]), default=None)
+    state = stage_state(True, sent_at, send and send["state"])
+    return {
+        "airline": airline,
+        "flt_nbr": flt_nbr,
+        "actdate": actdate,
+        "status": status,
+        "plant": plant_for(airline),
+        "state": state,
+        "locked": state == "SENT",
+        "sent_at": sent_at,
+        "return_of": return_of,
+        "return_flight": return_flight,
+        "send": dict(send) if send else None,
+        "sectors": [
+            {
+                "sector_nbr": cur["sector_nbr"],
+                "i033": _i033_out(cur),
+                "i034": [_i034_out(m) for m in meals if m["secnr"] == cur["sector_nbr"]],
+                "versions": [
+                    {
+                        k: x[k]
+                        for k in (
+                            "version_no",
+                            "is_current",
+                            "created_source",
+                            "created_by",
+                            "created_at",
+                            "source_email_id",
+                        )
+                    }
+                    for x in rows
+                    if x["sector_nbr"] == cur["sector_nbr"]
+                ],
+            }
+            for cur in current
+        ],
+        "review_items": [dict(x) for x in review_items],
+    }
+
+
+def get_version(
+    conn: Connection,
+    airline: str,
+    flt_nbr: str,
+    actdate: date,
+    status: str,
+    sector_nbr: int,
+    version_no: int,
+):
+    """One stored version of a sector's I033 and I034, current or not."""
+    i = t.i033.c
+    row = (
+        conn.execute(
+            select(t.i033).where(
+                i.airline == airline,
+                i.flt_nbr == flt_nbr,
+                i.actdate == actdate,
+                i.status == status,
+                i.sector_nbr == sector_nbr,
+                i.version_no == version_no,
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        return None
+    meals = _i034_rows(conn, airline, flt_nbr, actdate, status, [(sector_nbr, version_no)])
+    return {"i033": _i033_out(row), "i034": [_i034_out(m) for m in meals]}
+
+
+def get_amf(conn: Connection, airline: str, flt_nbr: str, actdate: date) -> list[dict]:
+    """Current AMF of each sector, with its lines. Empty until both stages exist."""
+    a = t.amf.c
+    heads = (
+        conn.execute(
+            select(t.amf)
+            .where(a.airline == airline, a.flt_nbr == flt_nbr, a.actdate == actdate, a.is_current)
+            .order_by(a.sector_nbr)
+        )
+        .mappings()
+        .all()
+    )
+    if not heads:
+        return []
+    ln = t.amf_line.c
+    lines = (
+        conn.execute(
+            select(t.amf_line)
+            .where(ln.amf_id.in_([h["amf_id"] for h in heads]))
+            .order_by(ln.amf_line_id)
+        )
+        .mappings()
+        .all()
+    )
+    return [{**h, "lines": [dict(x) for x in lines if x["amf_id"] == h["amf_id"]]} for h in heads]
+
+
+def get_email(conn: Connection, email_id: int):
+    m = t.email.c
+    row = (
+        conn.execute(
+            select(
+                m.email_id,
+                m.sender,
+                m.subject,
+                m.received_at,
+                m.airline,
+                m.detected_status,
+                m.confidence,
+                m.pipeline_status,
+                m.rejection_reason,
+                m.body_preview,
+            ).where(m.email_id == email_id)
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else None

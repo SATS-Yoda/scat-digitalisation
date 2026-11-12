@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.db
+node_modules/
+dist/
+# Real operational samples never go in the repo (see docs/HANDOVER.md, Engineering rules)
+*.dat
+*.eml
