@@ -1,25 +1,51 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import date
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Path, Query
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
-from . import queries, schemas
+from . import commands, queries, schemas
+from .auth import Forbidden, User, current_user
+from .dify import SapSendResult
 
 Airline = Annotated[str, Path(pattern=r"^[A-Z0-9]{2,3}$")]
 FltNbr = Annotated[str, Path(pattern=r"^[A-Z0-9]{1,5}$")]
+SapSender = Callable[[dict, str], SapSendResult]
+
+_STAGE = "/api/flights/{airline}/{flt_nbr}/{actdate}/stages/{status}"
+_ERRORS = {
+    commands.NotFound: 404,
+    commands.Conflict: 409,
+    commands.Invalid: 422,
+    Forbidden: 403,
+}
 
 
-def create_app(engine: Engine) -> FastAPI:
+def create_app(engine: Engine, sap_sender: SapSender | None = None) -> FastAPI:
     app = FastAPI(title="Meal request console API")
+
+    for exc_type, code in _ERRORS.items():
+
+        @app.exception_handler(exc_type)
+        def handle(_: Request, exc: Exception, code: int = code) -> JSONResponse:
+            return JSONResponse({"detail": str(exc)}, status_code=code)
 
     def get_conn() -> Iterator[Connection]:
         with engine.connect() as conn:
             yield conn
 
+    def get_tx() -> Iterator[Connection]:
+        """A connection whose work commits when the request succeeds and rolls back when
+        it raises."""
+        with engine.begin() as conn:
+            yield conn
+
     Conn = Annotated[Connection, Depends(get_conn)]
+    Tx = Annotated[Connection, Depends(get_tx)]
+    Me = Annotated[User, Depends(current_user)]
 
     @app.get("/health")
     def health() -> dict:
@@ -29,6 +55,8 @@ def create_app(engine: Engine) -> FastAPI:
     def ready(conn: Conn) -> dict:
         conn.execute(text("SELECT 1"))
         return {"status": "ready"}
+
+    # --- Read ----------------------------------------------------------------------------
 
     @app.get("/api/flights", response_model=list[schemas.FlightSummary])
     def list_flights(
@@ -40,10 +68,7 @@ def create_app(engine: Engine) -> FastAPI:
     ):
         return queries.list_flights(conn, date_from, date_to, airline, plant)
 
-    @app.get(
-        "/api/flights/{airline}/{flt_nbr}/{actdate}/stages/{status}",
-        response_model=schemas.StageDetail,
-    )
+    @app.get(_STAGE, response_model=schemas.StageDetail)
     def get_stage(
         conn: Conn, airline: Airline, flt_nbr: FltNbr, actdate: date, status: schemas.Status
     ):
@@ -53,8 +78,7 @@ def create_app(engine: Engine) -> FastAPI:
         return stage
 
     @app.get(
-        "/api/flights/{airline}/{flt_nbr}/{actdate}/stages/{status}"
-        "/sectors/{sector_nbr}/versions/{version_no}",
+        _STAGE + "/sectors/{sector_nbr}/versions/{version_no}",
         response_model=schemas.VersionDetail,
     )
     def get_version(
@@ -87,5 +111,53 @@ def create_app(engine: Engine) -> FastAPI:
         if email is None:
             raise HTTPException(404, f"No email with id {email_id}")
         return email
+
+    # --- Write ---------------------------------------------------------------------------
+
+    @app.put(_STAGE + "/sectors/{sector_nbr}", response_model=schemas.SaveResult)
+    def save_sector(
+        tx: Tx,
+        me: Me,
+        airline: Airline,
+        flt_nbr: FltNbr,
+        actdate: date,
+        status: schemas.Status,
+        sector_nbr: int,
+        edit: schemas.SectorEdit,
+    ):
+        return commands.save_sector(tx, me, airline, flt_nbr, actdate, status, sector_nbr, edit)
+
+    @app.post(_STAGE + "/review", status_code=204)
+    def mark_reviewed(
+        tx: Tx, me: Me, airline: Airline, flt_nbr: FltNbr, actdate: date, status: schemas.Status
+    ) -> None:
+        commands.mark_reviewed(tx, me, airline, flt_nbr, actdate, status)
+
+    @app.post(_STAGE + "/not-released", status_code=204)
+    def mark_not_released(
+        tx: Tx, me: Me, airline: Airline, flt_nbr: FltNbr, actdate: date, status: schemas.Status
+    ) -> None:
+        commands.mark_not_released(tx, me, airline, flt_nbr, actdate, status)
+
+    @app.post("/api/review-items/{review_item_id}/resolve", status_code=204)
+    def resolve_review_item(
+        tx: Tx, me: Me, review_item_id: int, body: schemas.ResolveRequest
+    ) -> None:
+        commands.resolve_review_item(tx, me, review_item_id, body.resolution_type, body.remarks)
+
+    @app.post(_STAGE + "/send", response_model=schemas.SendResult)
+    def send(me: Me, airline: Airline, flt_nbr: FltNbr, actdate: date, status: schemas.Status):
+        if sap_sender is None:
+            raise HTTPException(503, "Sending to SAP is not configured on this server")
+        # Three steps, each committed on its own: claim the unit, call the workflow, record
+        # the outcome. The claim must be visible to other requests while the workflow runs.
+        with engine.begin() as conn:
+            claim = commands.begin_send(conn, me, airline, flt_nbr, actdate, status)
+        # ceiling: if the process dies here the row stays SENDING and needs a manual reset;
+        # add a stale-claim sweep with auto-release (build order step 6).
+        result = sap_sender(claim["inputs"], me.id)
+        with engine.begin() as conn:
+            outcome = commands.finish_send(conn, claim["send_id"], claim["inputs"], result)
+        return {**outcome, "warnings": claim["warnings"]}
 
     return app

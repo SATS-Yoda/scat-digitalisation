@@ -4,11 +4,17 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Status = Literal["P24H", "P06H"]
 Plant = Literal["ICC1", "ICC2"]
 StageState = Literal["NO_DATA", "PENDING", "NOT_RELEASED", "SENDING", "SENT", "FAILED"]
+ReviewState = Literal["NOT_REVIEWED", "REVIEWED_OK", "REVIEWED_AMENDED"]
+Slot = Literal[
+    "p", "jm", "ju", "jf", "ja", "sm", "su", "sf", "sa",
+    "yu", "yf", "ya", "y", "staff_p", "staff_j", "staff_s", "staff_y",
+]  # fmt: skip
+_Edit = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
 
 class FlightRef(BaseModel):
@@ -21,6 +27,7 @@ class StageSummary(BaseModel):
     status: Status
     state: StageState
     sectors: int
+    review_state: ReviewState
     open_review_items: int
     blocking_review_items: int
     sent_at: datetime | None
@@ -120,6 +127,8 @@ class StageDetail(FlightRef):
     plant: Plant
     state: StageState
     locked: bool
+    review_state: ReviewState
+    return_flight_missing: bool
     sent_at: datetime | None
     return_of: FlightRef | None
     return_flight: FlightRef | None
@@ -165,3 +174,57 @@ class Email(BaseModel):
     pipeline_status: str
     rejection_reason: str | None
     body_preview: str | None
+
+
+# --- Requests and results of the write side ---------------------------------------------
+
+
+class ClassEdit(BaseModel):
+    model_config = _Edit
+    slot: Slot
+    code: str | None = Field(None, max_length=3)
+    pax: int | None = Field(None, ge=0)
+
+
+class I034Edit(BaseModel):
+    model_config = _Edit
+    class_code: str = Field(min_length=1, max_length=3)
+    meal_type: str | None = Field(None, max_length=2)
+    spml_id: str = Field(min_length=1, max_length=40)
+    qnty: int = Field(ge=0)
+    pname: str | None = Field(None, max_length=40)
+    meal_nr: str | None = Field(None, max_length=2)
+    txt: str | None = Field(None, max_length=255)
+
+
+class SectorEdit(BaseModel):
+    """A save. Class slots left out keep their current value; `i034` replaces every special
+    meal line of the sector."""
+
+    model_config = _Edit
+    base_version_no: int
+    classes: list[ClassEdit] = []
+    i034: list[I034Edit]
+
+
+class SaveResult(BaseModel):
+    version_no: int
+    warnings: list[str]
+
+
+class ResolveRequest(BaseModel):
+    model_config = _Edit
+    resolution_type: Literal["AMENDED", "ACCEPTED"]
+    remarks: str | None = None
+
+    @model_validator(mode="after")
+    def accepted_needs_remarks(self):
+        if self.resolution_type == "ACCEPTED" and not self.remarks:
+            raise ValueError("Remarks are required when an item is accepted as extracted")
+        return self
+
+
+class SendResult(BaseModel):
+    state: Literal["SENT", "FAILED"]
+    failure_reason: str | None
+    warnings: list[str]

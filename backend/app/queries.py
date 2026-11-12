@@ -23,7 +23,15 @@ def stage_state(has_data: bool, sent_at: object, send_state: str | None) -> str:
     return "PENDING" if has_data else "NO_DATA"
 
 
-def _return_maps(conn: Connection) -> tuple[dict, dict]:
+def review_state(sectors: int, edited: int, reviewed: int) -> str:
+    """Reviewed amended once a user has edited any current sector; reviewed OK once every
+    current sector has been confirmed unchanged."""
+    if edited:
+        return "REVIEWED_AMENDED"
+    return "REVIEWED_OK" if sectors and reviewed == sectors else "NOT_REVIEWED"
+
+
+def return_maps(conn: Connection) -> tuple[dict, dict]:
     rows = conn.execute(select(t.return_map).where(t.return_map.c.is_active)).mappings().all()
     # ceiling: one return flight per outbound flight, as the handover describes. The table's
     # key would allow several; the last one read wins here.
@@ -32,7 +40,7 @@ def _return_maps(conn: Connection) -> tuple[dict, dict]:
     return by_outbound, by_return
 
 
-def _outbound_of(by_return: dict, airline: str, flt_nbr: str, actdate: date) -> dict | None:
+def outbound_for(by_return: dict, airline: str, flt_nbr: str, actdate: date) -> dict | None:
     m = by_return.get((airline, flt_nbr))
     if m is None:
         return None
@@ -43,7 +51,7 @@ def _outbound_of(by_return: dict, airline: str, flt_nbr: str, actdate: date) -> 
     }
 
 
-def _return_of(by_outbound: dict, airline: str, flt_nbr: str, actdate: date) -> dict | None:
+def return_for(by_outbound: dict, airline: str, flt_nbr: str, actdate: date) -> dict | None:
     m = by_outbound.get((airline, flt_nbr))
     if m is None:
         return None
@@ -66,7 +74,7 @@ def list_flights(
     The date range applies to the outbound flight; a return flight on a later day still
     comes back under its outbound flight.
     """
-    by_outbound, by_return = _return_maps(conn)
+    by_outbound, by_return = return_maps(conn)
     pad = timedelta(days=max((abs(m["day_offset"]) for m in by_outbound.values()), default=0))
 
     def scope(airline_col, date_col) -> list:
@@ -95,7 +103,14 @@ def list_flights(
             # later email produced a newer unsent version.
             func.max(i.sent_to_sap_at).label("sent_at"),
             func.max(case((i.is_current, i.created_at))).label("updated_at"),
+            func.sum(case((and_(i.is_current, i.created_source == "USER"), 1), else_=0)).label(
+                "edited"
+            ),
+            func.sum(
+                case((and_(i.is_current, t.i033_review.c.i033_id.is_not(None)), 1), else_=0)
+            ).label("reviewed"),
         )
+        .join_from(t.i033, t.i033_review, isouter=True)
         .where(*scope(i.airline, i.actdate))
         .group_by(i.airline, i.flt_nbr, i.actdate, i.status)
     ).mappings()
@@ -143,6 +158,9 @@ def list_flights(
                     "status": status,
                     "state": stage_state(row is not None, sent_at, send and send["state"]),
                     "sectors": row["sectors"] if row else 0,
+                    "review_state": review_state(row["sectors"], row["edited"], row["reviewed"])
+                    if row
+                    else "NOT_REVIEWED",
                     "open_review_items": sum(c["open"] for c in counts),
                     "blocking_review_items": sum(c["blocking"] for c in counts),
                     "sent_at": sent_at,
@@ -156,7 +174,7 @@ def list_flights(
     # and leave only a review item), folded onto their outbound flight.
     outbound_flights = set()
     for airline_, flt_nbr, actdate, _ in [*data, *reviews]:
-        ob = _outbound_of(by_return, airline_, flt_nbr, actdate)
+        ob = outbound_for(by_return, airline_, flt_nbr, actdate)
         outbound_flights.add(tuple(ob.values()) if ob else (airline_, flt_nbr, actdate))
 
     result = []
@@ -164,7 +182,7 @@ def list_flights(
         airline_, flt_nbr, actdate = flight
         if (date_from and actdate < date_from) or (date_to and actdate > date_to):
             continue
-        ret = _return_of(by_outbound, *flight)
+        ret = return_for(by_outbound, *flight)
         if ret:
             ret["stages"] = stages(tuple(ret.values()), flight)
         result.append(
@@ -252,9 +270,9 @@ def get_stage(conn: Connection, airline: str, flt_nbr: str, actdate: date, statu
     if not rows:
         return None
 
-    by_outbound, by_return = _return_maps(conn)
-    return_of = _outbound_of(by_return, airline, flt_nbr, actdate)
-    return_flight = _return_of(by_outbound, airline, flt_nbr, actdate)
+    by_outbound, by_return = return_maps(conn)
+    return_of = outbound_for(by_return, airline, flt_nbr, actdate)
+    return_flight = return_for(by_outbound, airline, flt_nbr, actdate)
 
     # A return flight has no send of its own; it follows its outbound flight's send row.
     unit = return_of or {"airline": airline, "flt_nbr": flt_nbr, "actdate": actdate}
@@ -315,6 +333,23 @@ def get_stage(conn: Connection, airline: str, flt_nbr: str, actdate: date, statu
         .all()
     )
 
+    reviewed = conn.execute(
+        select(func.count()).where(t.i033_review.c.i033_id.in_([x["i033_id"] for x in current]))
+    ).scalar()
+    edited = sum(x["created_source"] == "USER" for x in current)
+
+    return_flight_missing = False
+    if return_flight:
+        return_flight_missing = not conn.execute(
+            select(func.count()).where(
+                i.airline == return_flight["airline"],
+                i.flt_nbr == return_flight["flt_nbr"],
+                i.actdate == return_flight["actdate"],
+                i.status == status,
+                i.is_current,
+            )
+        ).scalar()
+
     sent_at = max((x["sent_to_sap_at"] for x in rows if x["sent_to_sap_at"]), default=None)
     state = stage_state(True, sent_at, send and send["state"])
     return {
@@ -324,7 +359,10 @@ def get_stage(conn: Connection, airline: str, flt_nbr: str, actdate: date, statu
         "status": status,
         "plant": plant_for(airline),
         "state": state,
-        "locked": state == "SENT",
+        # No edits once sent, or while a send is in flight.
+        "locked": state in ("SENT", "SENDING"),
+        "review_state": review_state(len(current), edited, reviewed),
+        "return_flight_missing": return_flight_missing,
         "sent_at": sent_at,
         "return_of": return_of,
         "return_flight": return_flight,

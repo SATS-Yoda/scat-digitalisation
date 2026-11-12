@@ -75,7 +75,7 @@ def test_stage_detail_uses_current_version(client):
     assert sector["i033"]["created_source"] == "USER"
     pax = {c["slot"]: c["pax"] for c in sector["i033"]["classes"]}
     assert (pax["y"], pax["jf"], pax["sm"]) == (178, 30, None)
-    assert [(m["spml_id"], m["qnty"]) for m in sector["i034"]] == [("VGML", 4), ("KSML", 1)]
+    assert [(m["spml_id"], m["qnty"]) for m in sector["i034"]] == [("VGML", 2), ("KSML", 1)]
     assert [v["version_no"] for v in sector["versions"]] == [2, 1]
     assert [r["error_code"] for r in detail["review_items"]] == ["LOW_CONFIDENCE"]
 
@@ -118,12 +118,17 @@ def test_old_version_is_readable(client):
 def test_amf(client):
     [amf] = client.get("/api/flights/SQ/856/2026-11-13/amf").json()
     assert (amf["amf_version"], amf["p06h_i033_id"]) == (2, 4)
-    assert [line["delta_qty"] for line in amf["lines"]] == [2, -2, 1]
+    assert [(x["cabin"], x["pax_p06h"], x["delta_qty"]) for x in amf["lines"]] == [
+        ("P", 4, None),
+        ("J", 30, None),
+        ("Y", 178, None),
+        ("Y", None, -1),
+    ]
     assert client.get("/api/flights/TR/508/2026-11-13/amf").json() == []
 
 
 def test_email(client):
     email = client.get("/api/emails/2").json()
-    assert email["subject"] == "SQ856/13NOV FINAL"
+    assert email["subject"] == "SQ856-13NOV-FINAL"
     assert "raw_record" not in email
     assert client.get("/api/emails/99").status_code == 404

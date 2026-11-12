@@ -4,8 +4,8 @@ Console for reviewing, editing and sending airline meal requests (I033 and I034)
 Design and open questions: [docs/HANDOVER.md](docs/HANDOVER.md). Columns of the existing
 tables: [docs/result_export.json](docs/result_export.json).
 
-Status: build order step 2 (backend read side) is in place. Not built yet: the migration for
-the console tables (step 1), edits and Send (3), frontend (4), Entra sign-in (5),
+Status: build order steps 2 and 3 (backend read side, edits and Send) are in place. Not
+built yet: the migration for the console tables (step 1), frontend (4), Entra sign-in (5),
 auto-release (6).
 
 ## Run the backend locally
@@ -26,6 +26,11 @@ uv run python -m pytest
 uv run ruff check .
 ```
 
+Tests run on in-memory SQLite. To run them on PostgreSQL, point `DATABASE_URL` at the test
+server and set `TEST_ON_POSTGRES=1`. They use only the `scat_console_dev` database on that
+server, which is wiped and re-seeded for every test; the shared `postgres` database with
+the Dify workflows' tables is never written to.
+
 On a SATS laptop set these first (user environment variables are simplest):
 
 | Variable | Value | Why |
@@ -36,28 +41,49 @@ On a SATS laptop set these first (user environment variables are simplest):
 
 ## Endpoints
 
-| Method and path | Returns |
+`{stage}` is `/api/flights/{airline}/{flt_nbr}/{actdate}/stages/{status}`.
+
+| Method and path | Does |
 | --- | --- |
 | `GET /api/flights?date_from&date_to&airline&plant` | Outbound flights in date order, state per stage, return flight nested |
-| `GET /api/flights/{airline}/{flt_nbr}/{actdate}/stages/{status}` | Current I033 and I034 per sector, version history, open review items, send state |
-| `GET .../stages/{status}/sectors/{sector_nbr}/versions/{version_no}` | One stored version |
+| `GET {stage}` | Current I033 and I034 per sector, version history, open review items, send state |
+| `GET {stage}/sectors/{sector_nbr}/versions/{version_no}` | One stored version |
 | `GET /api/flights/{airline}/{flt_nbr}/{actdate}/amf` | Current AMF per sector with lines |
 | `GET /api/emails/{email_id}` | Email metadata and `body_preview` |
+| `PUT {stage}/sectors/{sector_nbr}` | Saves an edit as a new version and regenerates the AMF |
+| `POST {stage}/review` | Marks the current versions as reviewed without changes |
+| `POST {stage}/send` | Sends the outbound flight and its return flight to SAP through Dify |
+| `POST {stage}/not-released` | Records the decision not to send (can still be sent later) |
+| `POST /api/review-items/{id}/resolve` | Closes a review item as `AMENDED` or `ACCEPTED` |
 | `GET /health`, `GET /ready` | Liveness; readiness (checks the database) |
+
+Write rules, in short: a stage that was sent, or is being sent, refuses every change (409).
+A save must name the version it was based on. Send is refused while blocking review items
+are open on the flight or its return flight; a missing return flight only warns. A failed
+send can be retried and reuses its file number.
 
 ## Deviations and assumptions
 
-- **Local database is SQLite, not PostgreSQL.** No Docker or PostgreSQL on the development
-  laptop. The read queries are plain SQL that runs on both; shared environments use
-  PostgreSQL. `app.seed` refuses to run against anything but SQLite. Tests should move to
-  PostgreSQL in CI once a pipeline exists.
-- **Console tables are not in any database yet.** `backend/app/tables.py` follows
-  [docs/scatdd_console_additions.sql](docs/scatdd_console_additions.sql); running it as a
-  migration is step 1.
+- **No migrations yet.** The baseline asks for Alembic. The local and dev databases are
+  built from `backend/app/tables.py`, which mirrors the shared test database as read on
+  12 Nov 2026. Step 1 turns [docs/scatdd_console_additions.sql](docs/scatdd_console_additions.sql)
+  into a migration for shared environments.
+- **One table added to the draft SQL:** `scatdd_i033_review_test`, for the "Reviewed OK"
+  button. Marked as proposed in the file.
+- **No sign-in yet.** Every endpoint is open and acts as a fixed development user with both
+  plants (`backend/app/auth.py`) until step 5. Do not deploy to a shared environment before
+  then.
+- **Dify output shape is unconfirmed.** `backend/app/dify.py` reads the shape proposed in
+  the handover. Tests use a fake workflow; the real one has not been called.
+- **A send interrupted by a process crash stays `SENDING`** and needs a manual reset until a
+  sweep is added with auto-release.
+- **Edited codes are free text.** Class and special meal codes are checked for length only,
+  and a class must start with P, J, S or Y so it can be placed on the AMF. A list of valid
+  special meal codes is still to come.
+- **AMF.** Rules follow the requirement document (Annex 12, Appendix C). Crew (staff) pax
+  are left off the form.
 - **One return flight per outbound flight.** The mapping table's key would allow several;
   the console shows one.
-- **No sign-in yet.** Every endpoint is open until step 5. Do not deploy to a shared
-  environment before then.
 - **Source email shows `body_preview` only.** Reading the full text from Blob storage needs
   the URI format of `eml_uri` / `text_uri` and an identity for the storage account.
 - **Seed data is synthetic.** Class codes in the I033 slot columns are placeholders.

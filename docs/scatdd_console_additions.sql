@@ -56,4 +56,13 @@ CREATE TABLE scatdd_airline_config_test (
     updated_at            timestamptz  NOT NULL DEFAULT now()
 );
 
+-- PROPOSED 2026-11-12 (not in the original draft): the "Reviewed OK" button.
+-- One row per I033 version a user confirmed without changing it. Keyed by
+-- version, so a newer version (later email or user edit) is unreviewed again.
+CREATE TABLE scatdd_i033_review_test (
+    i033_id     bigint PRIMARY KEY REFERENCES scatdd_i033_test (i033_id),
+    reviewed_by varchar(100) NOT NULL,   -- Entra object id
+    reviewed_at timestamptz  NOT NULL DEFAULT now()
+);
+
 COMMIT;
