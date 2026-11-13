@@ -44,9 +44,9 @@ Out of scope for this repo: the Logic App and both Dify workflows (owned by the 
 | 6 | Auto-release | Not started |
 
 All work is on the branch `feat/backend-read-side`, which is on GitHub
-(`SATS-Yoda/scat-digitalisation`) up to commit `e0a6fe6`. There is no pull request. `main`
-holds only the initial commit. Commit `c0fedb4` (stage page layout) is local only, and the
-13 Nov changes listed under "Added 13 Nov 2026" are in the working tree, not yet committed.
+(`SATS-Yoda/scat-digitalisation`). There is no pull request. `main` holds only the initial
+commit. The branch on GitHub was last pushed at `65bebf7`; commits after that are local
+until pushed (check with `git status`).
 
 Checks on 13 Nov 2026: backend 55 tests pass on SQLite and on PostgreSQL (the admin
 endpoints are now covered there). Frontend type check and 12 unit tests pass. The
@@ -237,7 +237,7 @@ the return rows.
 - `frontend/vite.config.ts` reads `API_URL` for the dev proxy (default 127.0.0.1:8000), so a
   second backend on another port can be tried without stopping the first.
 
-## Added 13 Nov 2026 (not yet committed, except `c0fedb4`)
+## Added 13 Nov 2026 (commits `c0fedb4`, `9a4dd3c`, `65bebf7`)
 
 - **Audit trail: one review press is one row.** The reviewed-OK mark is stored per sector,
   so a two-sector flight showed two rows for one click. `audit_events`
@@ -270,8 +270,16 @@ the return rows.
 - No Alembic, Dockerfile, Helm chart, pipeline, structured logging or metrics yet.
 - The frontend has no ESLint or component tests, and FastAPI does not serve the built
   files yet.
-- In the browser, the Send confirm, Resolve, Do not release and the admin save actions
-  were not clicked through; the backend behind them is tested.
+- Browser click-through on 13 Nov, against the real-data copy in `scat_console_dev`: all of
+  these worked: adding a return-flight mapping (SQ 856 to SQ 857, next day, nested on the
+  dashboard), adding an airline and saving hold time and the automatic switch, Resolve
+  (Accepted needs remarks; the button stays disabled without them), Do not release, saving
+  a sector edit as a new version (review state became amended, AMF regenerated), and the
+  Send confirm. Send failed cleanly with "Sending to SAP is not configured on this server"
+  (no Dify key), leaving the stage Pending and creating no send record. A real send, and
+  the Send success and failure screens, are untested. That click-through left test changes
+  in the dev copy (return mapping SQ 856 to 857, an airline setting for QR, SQ 38 P24H item
+  resolved, QR 943 P06H not released, QR 943 P24H at version 2, SQ 12 P24H reviewed).
 - The dashboard has no "Missing" status: that needs departure times, which are not stored.
   They are to come from another MSSQL database (see "Departure times" under Next steps).
 - No amendments report yet (see "Amendments report" under Next steps).
