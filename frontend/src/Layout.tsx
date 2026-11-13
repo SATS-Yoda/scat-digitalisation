@@ -3,6 +3,7 @@ import {
   History,
   LayoutDashboard,
   type LucideIcon,
+  Mail,
   Moon,
   RefreshCw,
   SlidersHorizontal,
@@ -106,6 +107,9 @@ export function Layout() {
         <nav aria-label="Main" className="flex flex-row flex-wrap gap-xxs lg:flex-col">
           <NavItem to="/" icon={LayoutDashboard}>
             Flights
+          </NavItem>
+          <NavItem to="/messages" icon={Mail}>
+            Messages
           </NavItem>
           <NavItem to="/audit" icon={History}>
             Audit trail

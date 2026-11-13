@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-from sqlalchemy import String, and_, case, cast, false, func, or_, select
+from sqlalchemy import Integer, String, and_, case, cast, false, func, or_, select
 from sqlalchemy.engine import Connection, RowMapping
 
 from . import tables as t
@@ -473,6 +473,76 @@ def get_email(conn: Connection, email_id: int):
         .first()
     )
     return dict(row) if row else None
+
+
+def list_emails(
+    conn: Connection,
+    plants: frozenset[str],
+    pipeline_status: str | None,
+    airline: str | None,
+    limit: int,
+) -> list[dict]:
+    """Every email the pipeline has seen, newest first, with the flights it produced and its
+    open review items. An email not yet matched to an airline has no plant, so everyone
+    signed in sees it (as with a single email read); the flights listed are plant-scoped."""
+    m = t.email.c
+    conditions = [or_(m.airline.is_(None), _plant_condition(m.airline, plants))]
+    if pipeline_status:
+        conditions.append(m.pipeline_status == pipeline_status)
+    if airline:
+        conditions.append(m.airline == airline)
+    rows = (
+        conn.execute(
+            select(
+                m.email_id,
+                m.received_at,
+                m.sender,
+                m.subject,
+                m.airline,
+                m.detected_status,
+                m.confidence,
+                m.pipeline_status,
+                m.rejection_reason,
+            )  # fmt: skip
+            .where(and_(*conditions))
+            .order_by(m.received_at.desc(), m.email_id.desc())
+            .limit(limit)
+        )
+        .mappings()
+        .all()
+    )
+    ids = [r["email_id"] for r in rows]
+    flights: dict[int, list[dict]] = {i: [] for i in ids}
+    open_items: dict[int, int] = {}
+    blocking: dict[int, int] = {}
+    if ids:
+        v = t.i033.c
+        for f in conn.execute(
+            select(v.source_email_id, v.airline, v.flt_nbr, v.actdate, v.status)
+            .where(v.source_email_id.in_(ids), _plant_condition(v.airline, plants))
+            .distinct()
+            .order_by(v.actdate, v.flt_nbr, v.status)
+        ).mappings():
+            flights[f["source_email_id"]].append(
+                {k: f[k] for k in ("airline", "flt_nbr", "actdate", "status")}
+            )
+        i, e = t.review_item.c, t.error_type.c
+        for r in conn.execute(
+            select(i.email_id, func.count().label("n"), func.sum(cast(e.blocks_release, Integer)))
+            .join(t.error_type, e.error_code == i.error_code)
+            .where(i.email_id.in_(ids), i.state == "OPEN")
+            .group_by(i.email_id)
+        ):
+            open_items[r[0]], blocking[r[0]] = r[1], int(r[2] or 0)
+    return [
+        {
+            **r,
+            "flights": flights[r["email_id"]],
+            "open_review_items": open_items.get(r["email_id"], 0),
+            "blocking_review_items": blocking.get(r["email_id"], 0),
+        }
+        for r in rows
+    ]
 
 
 def _plant_condition(airline_col, plants: frozenset[str]):

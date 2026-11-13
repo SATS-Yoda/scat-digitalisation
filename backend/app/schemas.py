@@ -176,6 +176,35 @@ class Email(BaseModel):
     body_preview: str | None
 
 
+PipelineStatus = Literal[
+    "RECEIVED", "PROCESSING", "PROCESSED_OK", "PROCESSED_PARTIAL", "PROCESSED_FAILED", "REJECTED"
+]
+
+
+class EmailFlight(BaseModel):
+    airline: str
+    flt_nbr: str
+    actdate: date
+    status: Status
+
+
+class EmailSummary(BaseModel):
+    """One row of the messages list: what arrived, how far it got, and what came of it."""
+
+    email_id: int
+    received_at: datetime
+    sender: str | None
+    subject: str | None
+    airline: str | None
+    detected_status: str | None
+    confidence: Decimal | None
+    pipeline_status: PipelineStatus
+    rejection_reason: str | None
+    flights: list[EmailFlight]
+    open_review_items: int
+    blocking_review_items: int
+
+
 class AuditEvent(BaseModel):
     at: datetime
     actor: str

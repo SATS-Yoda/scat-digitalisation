@@ -1,3 +1,6 @@
+from datetime import UTC, datetime
+
+
 def flights(client, **params):
     response = client.get("/api/flights", params=params)
     assert response.status_code == 200
@@ -132,6 +135,54 @@ def test_email(client):
     assert email["subject"] == "SQ856-13NOV-FINAL"
     assert "raw_record" not in email
     assert client.get("/api/emails/99").status_code == 404
+
+
+def add_email(engine, pipeline_status, airline=None, reason=None, subject="extra"):
+    from app import tables as t
+
+    with engine.begin() as conn:
+        conn.execute(
+            t.email.insert().values(
+                eml_uri=f"synthetic/{subject}.eml",
+                subject=subject,
+                received_at=datetime(2026, 11, 14, 8, 0, tzinfo=UTC),
+                airline=airline,
+                pipeline_status=pipeline_status,
+                rejection_reason=reason,
+            )
+        )
+
+
+def test_email_list_shows_what_each_email_produced(client):
+    emails = {e["subject"]: e for e in client.get("/api/emails").json()}
+    final = emails["SQ856-13NOV-FINAL"]
+    assert ("856", "P06H") in [(f["flt_nbr"], f["status"]) for f in final["flights"]]
+    assert (final["open_review_items"], final["blocking_review_items"]) == (1, 0)
+    qr = emails["QR943-13NOV"]
+    assert [(f["flt_nbr"], f["status"]) for f in qr["flights"]] == [("943", "P24H")]  # two sectors
+    assert (qr["open_review_items"], qr["blocking_review_items"]) == (1, 1)
+    assert "body_preview" not in qr and "raw_record" not in qr
+
+
+def test_email_list_shows_failed_and_rejected_emails_with_no_flight(client, engine):
+    add_email(engine, "REJECTED", reason="Not a meal request", subject="invoice")
+    add_email(engine, "PROCESSED_FAILED", airline="QR", subject="QR garbled")
+    emails = client.get("/api/emails").json()
+    assert emails[0]["subject"] in {"invoice", "QR garbled"}  # newest first
+    rejected = client.get("/api/emails", params={"status": "REJECTED"}).json()
+    assert [(e["subject"], e["airline"], e["flights"]) for e in rejected] == [("invoice", None, [])]
+    assert rejected[0]["rejection_reason"] == "Not a meal request"
+    failed = client.get(
+        "/api/emails", params={"status": "PROCESSED_FAILED", "airline": "QR"}
+    ).json()
+    assert [e["subject"] for e in failed] == ["QR garbled"]
+    assert client.get("/api/emails", params={"airline": "SQ", "status": "REJECTED"}).json() == []
+
+
+def test_email_list_validates_its_filters_and_limit(client):
+    assert client.get("/api/emails", params={"status": "NOPE"}).status_code == 422
+    assert client.get("/api/emails", params={"limit": 0}).status_code == 422
+    assert len(client.get("/api/emails", params={"limit": 1}).json()) == 1
 
 
 def test_audit_trail_lists_who_did_what_newest_first(client):

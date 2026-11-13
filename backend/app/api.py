@@ -183,6 +183,16 @@ def create_app(
         require_plant(me, airline)
         return queries.get_amf(conn, airline, flt_nbr, actdate)
 
+    @app.get("/api/emails", response_model=list[schemas.EmailSummary])
+    def list_emails(
+        conn: Conn,
+        me: Me,
+        status: schemas.PipelineStatus | None = None,
+        airline: Annotated[str | None, Query(pattern=r"^[A-Z0-9]{2,3}$")] = None,
+        limit: Annotated[int, Query(ge=1, le=500)] = 200,
+    ):
+        return queries.list_emails(conn, me.plants, status, airline, limit)
+
     @app.get("/api/emails/{email_id}", response_model=schemas.Email)
     def get_email(conn: Conn, me: Me, email_id: int):
         email = queries.get_email(conn, email_id)

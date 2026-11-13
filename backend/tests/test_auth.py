@@ -194,6 +194,15 @@ def test_redis_store_namespaces_keys_and_sets_expiry():
     assert store.get("k") is None
 
 
+def test_email_list_is_scoped_to_the_users_plants(signed_out, provider):
+    sign_in(signed_out, provider, ["g-icc2"])
+    emails = signed_out.get("/api/emails").json()
+    assert {e["airline"] for e in emails} == {"QR"}
+    assert signed_out.get("/api/emails", params={"airline": "SQ"}).json() == []
+    sign_in(signed_out, provider, ["g-icc1"], code="c2")
+    assert {e["airline"] for e in signed_out.get("/api/emails").json()} == {"SQ"}
+
+
 def test_audit_trail_is_scoped_to_the_users_plants(signed_out, provider):
     sign_in(signed_out, provider, ["g-icc2"])
     assert {e["airline"] for e in signed_out.get("/api/audit").json()} - {"SQ"}

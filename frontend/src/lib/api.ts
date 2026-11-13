@@ -208,6 +208,39 @@ export interface AuditEvent extends FlightRef {
   detail: string | null;
 }
 
+export type PipelineStatus =
+  | "RECEIVED"
+  | "PROCESSING"
+  | "PROCESSED_OK"
+  | "PROCESSED_PARTIAL"
+  | "PROCESSED_FAILED"
+  | "REJECTED";
+
+export interface EmailFlight extends FlightRef {
+  status: Status;
+}
+
+/** One row of the messages list: what arrived, how far it got and what came of it. */
+export interface EmailSummary {
+  email_id: number;
+  received_at: string;
+  sender: string | null;
+  subject: string | null;
+  airline: string | null;
+  detected_status: string | null;
+  confidence: string | null;
+  pipeline_status: PipelineStatus;
+  rejection_reason: string | null;
+  flights: EmailFlight[];
+  open_review_items: number;
+  blocking_review_items: number;
+}
+
+export interface EmailFilters {
+  status?: string;
+  airline?: string;
+}
+
 export interface AuditFilters {
   date_from?: string;
   date_to?: string;
@@ -279,6 +312,12 @@ export const api = {
     request<VersionDetail>(`${stagePath(f, status)}/sectors/${sector}/versions/${version}`),
   amf: (f: FlightRef) => request<Amf[]>(`/api/flights/${f.airline}/${f.flt_nbr}/${f.actdate}/amf`),
   email: (id: number) => request<Email>(`/api/emails/${id}`),
+  emails: (filters: EmailFilters) => {
+    const params = new URLSearchParams(
+      Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])),
+    );
+    return request<EmailSummary[]>(`/api/emails?${params}`);
+  },
   audit: (filters: AuditFilters) => {
     const params = new URLSearchParams(
       Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])),
