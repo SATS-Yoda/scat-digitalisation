@@ -258,7 +258,11 @@ the return rows.
 - **Stage page layout (`c0fedb4`).** The action bar's message started from zero width, so at
   medium widths it wrapped to one word per line; it and the review item rows now have a
   minimum starting width.
-- **Dashboard table at middle widths (not yet committed).** The table needed 679 px where
+- **Messages page (gap 1 below).** `GET /api/emails` and `/messages`, with 4 backend tests
+  (59 pass on SQLite; not run on PostgreSQL as a suite, but the endpoint was checked
+  against the real-data copy there: counts match the database, 34 emails). Fits without
+  sideways scroll at 640 and 900 px; about 20 px over at 480 px.
+- **Dashboard table at middle widths (`b0e30a7`).** The table needed 679 px where
   558 px were available at a 640 px window, so the stage columns scrolled out of view. The
   return row's label now wraps, the date can wrap, and below 768 px the Plant column is
   hidden and shown under the flight number. No sideways scroll at 560 to 900 px; at 480 px
@@ -354,13 +358,16 @@ Checked on 13 Nov 2026 against sections 2.1 to 2.5 and 3.1 to 3.8, apart from de
 times (above). Ordered by importance. Items marked "workflow" mostly belong to the Logic App
 or Dify workflows owned by the intern; the console part is what is listed.
 
-1. **Failed and rejected emails are invisible (2.1.2, 2.1.8, 2.2).** The dashboard lists
-   flights only. In the 13 Nov copy of the real data, 20 of 34 emails have no I033 row (5
-   `PROCESSED_FAILED`, 2 `REJECTED`, 8 `PROCESSED_PARTIAL`, 5 `PROCESSED_OK`), so no flight
-   row exists for them. The RFQ dashboard statuses "Received/Processing", "Processed OK",
-   "Processed Failed" and "Processed Partially" are not shown; `pipeline_status` is only
-   returned by the email read. Needed: a messages list by processing status, and those
-   statuses on the dashboard.
+1. **Failed and rejected emails were invisible (2.1.2, 2.1.8, 2.2). Partly done.** In the
+   13 Nov copy of the real data, 20 of 34 emails have no I033 row (5 `PROCESSED_FAILED`, 2
+   `REJECTED`, 8 `PROCESSED_PARTIAL`, 5 `PROCESSED_OK`), so no flight row exists for them.
+   Built on 13 Nov: a Messages page (`/messages`, `GET /api/emails`) listing every email
+   newest first with its processing status, rejection reason, the flights it produced
+   (linked) and its open and blocking review items; filters for status and airline.
+   Emails with no airline are visible to every signed-in user; the flights shown are
+   plant-scoped. Still missing: the RFQ dashboard statuses "Received/Processing",
+   "Processed OK", "Processed Failed" and "Processed Partially" on the flight rows
+   themselves, status counts, and a date filter on the messages list.
 2. **The source email text is never shown (2.1.8).** `body_preview` is empty for all 34
    emails, so the evidence highlight, which marks the part of the email that could not be
    processed, works only on synthetic data. Needs the `eml_uri` / `text_uri` format from the
