@@ -4,7 +4,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { "@": path.resolve(__dirname, "src") } },
+  // preserveSymlinks: node_modules may be a link to an install outside OneDrive.
+  resolve: { alias: { "@": path.resolve(__dirname, "src") }, preserveSymlinks: true },
   server: {
     port: 5173,
     // The API runs as a separate process in development.

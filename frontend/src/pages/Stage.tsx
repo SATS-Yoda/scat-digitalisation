@@ -203,7 +203,7 @@ function ReviewItems({
               onFocus={() => onEvidence(item)}
               onBlur={() => onEvidence(null)}
             >
-              <div className="flex min-w-0 flex-1 flex-col gap-xxs text-sm">
+              <div className="flex min-w-0 flex-[1_1_14rem] flex-col gap-xxs text-sm">
                 <div className="flex flex-wrap items-center gap-xs">
                   {item.blocks_release ? (
                     <Pill tone="error" icon={ShieldAlert}>
@@ -539,7 +539,8 @@ export function StagePage() {
       {heading}
 
       <Card className="flex flex-wrap items-center justify-between gap-md p-md">
-        <div className="flex min-w-0 flex-1 flex-col gap-xxs text-sm">
+        {/* 16rem start width: the buttons wrap to their own row before this text gets squeezed. */}
+        <div className="flex min-w-0 flex-[1_1_16rem] flex-col gap-xxs text-sm">
           {stage.state === "SENT" ? (
             <span className="flex items-center gap-xs font-semibold">
               <Lock className="size-4" strokeWidth={1.75} aria-hidden />
