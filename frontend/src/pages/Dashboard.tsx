@@ -148,7 +148,9 @@ export function DashboardPage() {
                 <tr>
                   <th scope="col">Date</th>
                   <th scope="col">Flight</th>
-                  <th scope="col">Plant</th>
+                  <th scope="col" className="hidden md:table-cell">
+                    Plant
+                  </th>
                   <th scope="col">P24H</th>
                   <th scope="col">P06H</th>
                 </tr>
@@ -157,9 +159,13 @@ export function DashboardPage() {
                 {flights.flatMap((f) => {
                   const rows = [
                     <tr key={`${f.airline}${f.flt_nbr}${f.actdate}`}>
-                      <td className="num whitespace-nowrap">{formatDate(f.actdate)}</td>
-                      <td className="num whitespace-nowrap font-semibold">{flightName(f)}</td>
-                      <td>{f.plant}</td>
+                      <td className="num">{formatDate(f.actdate)}</td>
+                      <td className="num whitespace-nowrap font-semibold">
+                        {flightName(f)}
+                        {/* The Plant column is hidden on narrow screens; show it here instead. */}
+                        <span className="block text-xs font-normal text-content-muted md:hidden">{f.plant}</span>
+                      </td>
+                      <td className="hidden md:table-cell">{f.plant}</td>
                       <td>
                         <StageCell flight={f} stage={stageOf(f.stages, "P24H")} />
                       </td>
@@ -172,15 +178,17 @@ export function DashboardPage() {
                   if (r) {
                     rows.push(
                       <tr key={`${r.airline}${r.flt_nbr}${r.actdate}-return`} className="bg-surface-secondary">
-                        <td className="num whitespace-nowrap text-content-secondary">{formatDate(r.actdate)}</td>
-                        <td className="whitespace-nowrap">
-                          <span className="inline-flex items-center gap-xs pl-sm">
-                            <CornerDownRight className="size-4 text-content-muted" strokeWidth={1.75} aria-hidden />
-                            <span className="num font-semibold">{flightName(r)}</span>
+                        <td className="num text-content-secondary">{formatDate(r.actdate)}</td>
+                        <td>
+                          <span className="inline-flex flex-wrap items-center gap-x-xs pl-sm">
+                            <span className="inline-flex items-center gap-xs whitespace-nowrap">
+                              <CornerDownRight className="size-4 text-content-muted" strokeWidth={1.75} aria-hidden />
+                              <span className="num font-semibold">{flightName(r)}</span>
+                            </span>
                             <span className="text-xs text-content-muted">Return, sent with {flightName(f)}</span>
                           </span>
                         </td>
-                        <td />
+                        <td className="hidden md:table-cell" />
                         <td>
                           <StageCell flight={r} stage={stageOf(r.stages, "P24H")} />
                         </td>
