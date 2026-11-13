@@ -258,6 +258,11 @@ the return rows.
 - **Stage page layout (`c0fedb4`).** The action bar's message started from zero width, so at
   medium widths it wrapped to one word per line; it and the review item rows now have a
   minimum starting width.
+- **Dashboard table at middle widths (not yet committed).** The table needed 679 px where
+  558 px were available at a 640 px window, so the stage columns scrolled out of view. The
+  return row's label now wraps, the date can wrap, and below 768 px the Plant column is
+  hidden and shown under the flight number. No sideways scroll at 560 to 900 px; at 480 px
+  it still overflows by about 17 px.
 
 ## Known gaps in what is built
 
@@ -343,10 +348,62 @@ Amendments report (later, not started; RFQ Annex 12 section 2.4 item 2):
   flights amended, amendments per flight, which classes or meal codes were changed most.
   The RFQ also asks (section 2.2) for export to Excel or PDF of dashboard and reports.
 
+## Gaps against the requirement document (RFQ Annex 12)
+
+Checked on 13 Nov 2026 against sections 2.1 to 2.5 and 3.1 to 3.8, apart from departure
+times (above). Ordered by importance. Items marked "workflow" mostly belong to the Logic App
+or Dify workflows owned by the intern; the console part is what is listed.
+
+1. **Failed and rejected emails are invisible (2.1.2, 2.1.8, 2.2).** The dashboard lists
+   flights only. In the 13 Nov copy of the real data, 20 of 34 emails have no I033 row (5
+   `PROCESSED_FAILED`, 2 `REJECTED`, 8 `PROCESSED_PARTIAL`, 5 `PROCESSED_OK`), so no flight
+   row exists for them. The RFQ dashboard statuses "Received/Processing", "Processed OK",
+   "Processed Failed" and "Processed Partially" are not shown; `pipeline_status` is only
+   returned by the email read. Needed: a messages list by processing status, and those
+   statuses on the dashboard.
+2. **The source email text is never shown (2.1.8).** `body_preview` is empty for all 34
+   emails, so the evidence highlight, which marks the part of the email that could not be
+   processed, works only on synthetic data. Needs the `eml_uri` / `text_uri` format from the
+   intern and a read from Blob storage.
+3. **Dashboard filters (2.2).** Built: date, airline, plant. Missing: flight number,
+   status, time range, and the default window of past 5 hours to next 24 hours (the
+   default is today and tomorrow by date).
+4. **Configuration (2.5).** Stored per airline: auto-release and its hold time only.
+   Missing: missing-email thresholds (X for P24H, Y for P06H), whether to expect a P06H
+   email, cabin class mapping to I033 and I034 classes, the default dashboard period, and
+   a managed list of airlines.
+5. **Export to Excel or PDF (3.1)** of the dashboard and reports: not built.
+6. **Audit by field (3.4).** The RFQ wants original and changed values by transaction,
+   date and field, plus a report, including changes by automated interfaces. The trail
+   shows events and version numbers. A page that compares two versions field by field is
+   not built, and AMF-to-version traceability (2.4) is not checked.
+7. **Amendments report (2.4):** see Next steps.
+8. **User administration and roles (3.2, 3.3).** The RFQ asks for in-app management of
+   user ids and roles, roles configurable by an administrator, an access display and
+   report, and roles such as reporting users and restricted vendors. The console uses Entra
+   groups with a plant split and one admin role. Decision for the owner: are Entra groups
+   enough?
+9. **Interface monitoring (3.5).** Not in the console: a job status view, an email alert
+   per job with summary statistics, manual download of the I033 and I034 files, and
+   re-processing of a failed email (workflow). Only the send retry exists.
+10. **Archival and retention (3.6):** no configurable retention period, no archive or
+    purge.
+11. **Missing-email alerts (2.3, optional)** depend on departure times and the Flight
+    Information Hub. **Auto-release (step 6)** is also still open.
+
+Also: the RFQ expects at least 340 flights a day. The dashboard has not been tried at that
+size; the default two-day view could be about 700 rows.
+
+Not visible from this repo and worth confirming with the intern (workflow): the other meal
+request types (2.1.3), no I034 for ex-sector flights (2.1.6), the add-on pax Z (2.1.7), and
+mail intake (2.1.1).
+
 ## Open
 
 With the owner:
 
+- Whether Entra groups are enough for roles, or an in-app user and role administration is
+  needed (RFQ 3.2, 3.3; gap 8 above).
 - Accept or change the proposed table `scatdd_i033_review_test` in the draft SQL.
 - Provide the list of valid special meal codes (reminder owed).
 - Whether `.claude/launch.json` stays in the repo.
