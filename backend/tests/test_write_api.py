@@ -331,3 +331,17 @@ def test_edit_and_review_appear_in_the_audit_trail(client):
     assert {e["action"] for e in resolved} >= {"EDITED", "REVIEWED_OK"}
     edit = next(e for e in resolved if e["action"] == "EDITED")
     assert (edit["status"], edit["sector_nbr"]) == ("P24H", 2)
+
+
+def test_one_review_press_is_one_audit_event(client):
+    """A flight with two sectors stores two marks but the trail shows one press."""
+    assert client.post(f"{QR943_P24H}/review").status_code == 204
+    events = [
+        e
+        for e in client.get("/api/audit", params={"airline": "QR"}).json()
+        if e["action"] == "REVIEWED_OK" and e["flt_nbr"] == "943" and e["status"] == "P24H"
+    ]
+    assert len(events) == 1
+    assert events[0]["sector_nbr"] is None
+    assert events[0]["detail"].startswith("Sector 1 version")
+    assert "sector 2 version" in events[0]["detail"]

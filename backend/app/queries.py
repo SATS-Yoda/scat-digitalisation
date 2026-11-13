@@ -540,7 +540,20 @@ def audit_events(
         .order_by(r.reviewed_at.desc())
         .limit(limit)
     )  # fmt: skip
-    add(reviewed.mappings(), action="REVIEWED_OK")
+    # The mark is stored per sector, but a user pressed one button: one event per press.
+    presses: dict[tuple, list[dict]] = {}
+    for row in reviewed.mappings():
+        key = tuple(row[k] for k in ("at", "actor", "airline", "flt_nbr", "actdate", "status"))
+        presses.setdefault(key, []).append(dict(row))
+    for rows in presses.values():
+        if len(rows) == 1:
+            events.append({**rows[0], "action": "REVIEWED_OK"})
+            continue
+        rows.sort(key=lambda r: r["sector_nbr"])
+        detail = ", ".join(f"sector {r['sector_nbr']} {r['detail'].lower()}" for r in rows)
+        events.append(
+            {**rows[0], "action": "REVIEWED_OK", "sector_nbr": None, "detail": detail.capitalize()}
+        )
 
     i = t.review_item.c
     resolved = conn.execute(
