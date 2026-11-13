@@ -1,17 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CornerDownRight, PlaneTakeoff, RotateCcw, ShieldAlert } from "lucide-react";
+import { useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { Card, EmptyState, ErrorState, ReviewPill, SkeletonRows, StatePill } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/form";
 import { api, type FlightFilters, type FlightRef, type StageSummary } from "@/lib/api";
+import { rememberDashboardSearch } from "@/lib/dashboardSearch";
 import { flightName, formatDate, isoDate, stageRoute } from "@/lib/format";
 
 /** Filters live in the URL so a link reproduces the screen. With no dates in the URL the
  *  dashboard shows today and tomorrow. */
 function useFilters() {
   const [params, setParams] = useSearchParams();
+  // Remember the filters so links back to the dashboard from other pages restore them.
+  const search = params.toString();
+  useEffect(() => rememberDashboardSearch(search ? `?${search}` : ""), [search]);
   const filters: FlightFilters = {
     date_from: params.get("date_from") ?? isoDate(0),
     date_to: params.get("date_to") ?? isoDate(1),

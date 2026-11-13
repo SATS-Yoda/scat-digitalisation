@@ -9,9 +9,10 @@ import {
   Sun,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { dashboardPath } from "@/lib/dashboardSearch";
 import { cn, formatTimestamp } from "@/lib/format";
 
 const THEME_KEY = "scat-console-theme";
@@ -27,9 +28,10 @@ function initialTheme(): "light" | "dark" {
 }
 
 function NavItem({ to, icon: Icon, children }: { to: string; icon: LucideIcon; children: string }) {
+  useLocation(); // re-render on every navigation so the dashboard link carries the latest filters
   return (
     <NavLink
-      to={to}
+      to={to === "/" ? dashboardPath() : to}
       end={to === "/"}
       className={({ isActive }) =>
         cn(

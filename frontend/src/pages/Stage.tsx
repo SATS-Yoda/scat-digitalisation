@@ -29,6 +29,7 @@ import {
   type Status,
 } from "@/lib/api";
 import { findEvidence } from "@/lib/evidence";
+import { dashboardPath } from "@/lib/dashboardSearch";
 import { cn, flightName, formatDate, formatDateTime, signed, stageRoute } from "@/lib/format";
 
 const CABINS: [string, string][] = [
@@ -479,7 +480,7 @@ export function StagePage() {
 
   const heading = (
     <header className="flex flex-col gap-sm">
-      <Link to="/" className="flex min-h-[44px] w-fit items-center gap-xs text-sm font-medium link">
+      <Link to={dashboardPath()} className="flex min-h-[44px] w-fit items-center gap-xs text-sm font-medium link">
         <ArrowLeft className="size-4" strokeWidth={1.75} aria-hidden /> Flights
       </Link>
       <div className="flex flex-wrap items-center justify-between gap-md">
