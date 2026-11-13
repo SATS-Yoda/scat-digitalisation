@@ -1,6 +1,6 @@
 # Meal request console: handover
 
-State as of 12 Nov 2026. Read this before writing code. It replaces the design handover of
+State as of 13 Nov 2026. Read this before writing code. It replaces the design handover of
 11 Nov 2026 (kept in git history). Items under "Open" are not decided; do not guess them.
 
 Companion files:
@@ -43,12 +43,14 @@ Out of scope for this repo: the Logic App and both Dify workflows (owned by the 
 | 5 | Entra sign-in and roles | Backend built, commit `d12a86e`, tested with fakes only. Frontend changes not started. Never run against Entra or Redis: blocked on IT for real values |
 | 6 | Auto-release | Not started |
 
-All work is on the local branch `feat/backend-read-side`. Nothing has been pushed and there
-is no pull request. `main` holds only the initial commit.
+All work is on the branch `feat/backend-read-side`, which is on GitHub
+(`SATS-Yoda/scat-digitalisation`) up to commit `e0a6fe6`. There is no pull request. `main`
+holds only the initial commit. Commit `c0fedb4` (stage page layout) is local only, and the
+13 Nov changes listed under "Added 13 Nov 2026" are in the working tree, not yet committed.
 
-Checks at the last commit: backend 39 tests pass on SQLite; the 37 tests that existed at
-step 3 also passed on PostgreSQL. The two admin endpoint tests added in step 4 have not
-been run on PostgreSQL. Frontend type check, 4 unit tests and production build pass.
+Checks on 13 Nov 2026: backend 55 tests pass on SQLite and on PostgreSQL (the admin
+endpoints are now covered there). Frontend type check and 12 unit tests pass. The
+production build was last run at step 4 and not repeated.
 
 ## Decisions
 
@@ -117,7 +119,9 @@ Read on 12 Nov 2026 (structure and code values only):
 - AMF line types are `PAX` and `SPML`; cabins are `P`, `J`, `YD`, `Y`.
 - The extraction workflow already writes AMF rows.
 - An error type `SQ_INCREASE_IGNORED` exists (informational, non-blocking).
-- The three console tables do not exist there yet.
+- The console tables do not exist in database `postgres` yet. Against it the flight list,
+  stage pages, audit trail and admin pages fail (missing tables); only the AMF and email
+  reads work. They do exist in `scat_console_dev` (see Databases).
 
 `backend/app/tables.py` mirrors all of this, so the local and dev databases behave like
 the real one.
@@ -127,28 +131,49 @@ the real one.
 Machine and network:
 
 - The repo lives in a OneDrive folder. That breaks hard links (`uv`) and makes OneDrive
-  sync `frontend/node_modules`. Moving the repo out of OneDrive would remove both problems.
-- Corporate TLS inspection: `uv` needs `UV_SYSTEM_CERTS=true`; npm and Node need
-  `NODE_EXTRA_CA_CERTS` pointing at an export of the Windows trusted roots. One was made at
-  `%LOCALAPPDATA%\scat-console\windows-roots.pem`. Never disable certificate checks.
+  sync `frontend/node_modules`, where files can turn into cloud-only placeholders that
+  vite cannot read ("The cloud operation was unsuccessful"). Moving the repo out of
+  OneDrive would remove both problems.
+- Corporate TLS inspection: `uv` needs `UV_SYSTEM_CERTS=true`; npm and Node may need
+  `NODE_EXTRA_CA_CERTS` pointing at an export of the Windows trusted roots (on the
+  13 Nov profile `npm ci` worked without it). Never disable certificate checks.
 - The Python virtual environment is outside OneDrive at
   `%LOCALAPPDATA%\scat-console\venv` (`UV_PROJECT_ENVIRONMENT`), with `UV_LINK_MODE=copy`.
+  Set both in every new shell, or `uv` will try to build a `.venv` inside the repo. The
+  `backend/.venv` that OneDrive carried over from another Windows profile is stale and
+  unused. The venv is built on a `uv`-managed Python 3.12 (`uv python install 3.12`); the
+  only system Python on the 13 Nov profile was 3.11, and the backend needs 3.12 or later.
+- `frontend/node_modules` is a junction to `%LOCALAPPDATA%\scat-console\frontend-deps\
+  node_modules`, installed there with `npm ci` from a copy of `package.json` and
+  `package-lock.json`. After a dependency change, copy both files there and run `npm ci`
+  there. `vite.config.ts` sets `resolve.preserveSymlinks` for this; without it React loads
+  twice and the page crashes. Delete the `.vite` folder in the target if vite misbehaves.
 - Run backend commands from `backend/`, as `uv run python -m ...`. Running `pytest.exe`
-  directly is blocked on this laptop; `python -m pytest` works.
-- Node is v18 (the baseline expects 20). No Docker and no local PostgreSQL.
+  directly is blocked on the older laptop; `python -m pytest` works.
+- Node is v24 on the 13 Nov profile (v18 earlier; the baseline expects 20). No Docker and
+  no local PostgreSQL.
 - PowerShell 5.1: pass multi-line commit messages with `git commit -F <file>`.
 - `.claude/launch.json` starts both dev servers for the preview pane.
 
 Databases:
 
 - **Local:** SQLite file `backend/dev.db`, rebuilt by `uv run python -m app.seed`.
-- **Azure test server:** reachable only from the owner's phone hotspot. It is not
-  production. Database `postgres` holds the intern's seven `scatdd_*_test` tables; the
-  console only ever read it. Database `scat_console_dev` was created for this work; the
-  seed and the PostgreSQL test run (`TEST_ON_POSTGRES=1`) wipe and rebuild it and touch no
-  other database.
-- `backend/.env` is gitignored. It currently points at SQLite. When it points at the Azure
-  server it has held the admin login, so treat it as sensitive and do not print it.
+- **Azure test server:** reachable only from the owner's phone hotspot (not from SATS
+  wifi; VPN untested). It is not production. Database `postgres` holds the intern's seven
+  `scatdd_*_test` tables; the console only ever read it. Database `scat_console_dev` was
+  created for this work; the seed and the PostgreSQL test run (`TEST_ON_POSTGRES=1`) wipe
+  and rebuild it with synthetic data and touch no other database.
+- On 13 Nov the seven intern tables were copied from `postgres` into `scat_console_dev`
+  (emails 34, I033 65, I034 1147, AMF 13, AMF lines 88, review items 27, error types 14),
+  with ids kept and sequences moved past them, so the console shows real processed data
+  without writing to the intern's tables. Every PostgreSQL test run wipes that copy; copy
+  it again afterwards. The one-off copy script was not kept in the repo. The console tables
+  are empty there, so no return-flight links, sends or airline settings exist yet.
+- `backend/.env` is gitignored. On 13 Nov it points at the Azure server, database
+  `scat_console_dev` (the URL must name the database and carry `?sslmode=require`, or the
+  server falls back to a database named after the login and fails), with `AUTH_DEV_MODE=true`.
+  It holds the admin login, so treat it as sensitive and do not print it. To use SQLite
+  again, point `DATABASE_URL` back at the SQLite file.
 
 Dify:
 
@@ -199,7 +224,7 @@ the return rows.
   (I033 versions, reviewed-OK marks, resolved review items, send decisions). No new table.
   Return flight and airline setting changes keep only their latest editor, so they are not
   in the trail; a history table would be needed. The server returns the latest 200 events
-  (max 500); the action filter works on those. Not run on PostgreSQL.
+  (max 500); the action filter works on those. Covered by the PostgreSQL test run.
 - **Stage page layout:** review items sit above the sectors. At P06H the AMF is a third
   column from the 2xl breakpoint (1536 px); below that it sits under the source email.
   The source email stays pinned only when the AMF is not below it.
@@ -211,6 +236,28 @@ the return rows.
   Checked in the browser on the seed data; frontend now has 8 unit tests.
 - `frontend/vite.config.ts` reads `API_URL` for the dev proxy (default 127.0.0.1:8000), so a
   second backend on another port can be tried without stopping the first.
+
+## Added 13 Nov 2026 (not yet committed, except `c0fedb4`)
+
+- **Audit trail: one review press is one row.** The reviewed-OK mark is stored per sector,
+  so a two-sector flight showed two rows for one click. `audit_events`
+  (`backend/app/queries.py`) now merges marks with the same time, user, flight and stage
+  into one row; the detail reads "Sector 1 version 2, sector 2 version 1" and the sector
+  column is empty. Nothing is stored differently. New test
+  `test_one_review_press_is_one_audit_event`.
+- **Audit detail available for an audit:** who (the extraction rows show the workflow
+  name, and every action shows `dev-user` while `AUTH_DEV_MODE` is on), when, flight,
+  stage, sector, and a short detail (version, error code and resolution, file names or
+  failure reason). Not kept: before and after values of an edit (the old versions exist, so
+  a diff can be built; the page does not show one), history of return-flight and airline
+  setting changes, source IP or session, protection against edits to the records.
+- **Dashboard filters are remembered.** They live in the URL, and links back to the
+  dashboard used plain `/`, which dropped them. The last filters are kept in
+  `sessionStorage` (`frontend/src/lib/dashboardSearch.ts`) and used by the sidebar Flights
+  item and the stage page's back link. Reset filters clears them. Per browser tab.
+- **Stage page layout (`c0fedb4`).** The action bar's message started from zero width, so at
+  medium widths it wrapped to one word per line; it and the review item rows now have a
+  minimum starting width.
 
 ## Known gaps in what is built
 
@@ -226,6 +273,8 @@ the return rows.
 - In the browser, the Send confirm, Resolve, Do not release and the admin save actions
   were not clicked through; the backend behind them is tested.
 - The dashboard has no "Missing" status: that needs departure times, which are not stored.
+  They are to come from another MSSQL database (see "Departure times" under Next steps).
+- No amendments report yet (see "Amendments report" under Next steps).
 
 ## Next steps
 
@@ -253,10 +302,38 @@ Left to do:
 
 Also pending:
 
-- Re-run the full test suite on PostgreSQL (hotspot needed) to cover the admin endpoints.
 - Step 1: turn the console SQL into an Alembic migration and agree with the intern who
   runs it on the shared database.
 - First real Dify send, once the workflow is published and its target folder is confirmed.
+
+Departure times (for the dashboard's "Missing" status, RFQ Annex 12 section 2.2):
+
+- Departure times are to be read from another MSSQL database. That database is reachable
+  only on the SATS network (office wifi or VPN). The Azure PostgreSQL server is not
+  reachable from SATS wifi, only from the owner's phone hotspot, so the two cannot be
+  reached from one laptop at the same time over wifi.
+- Whether both can be reached over the VPN has not been tested. Test that first; the
+  design depends on it (a console that must reach both, or a copy of the departure times
+  into PostgreSQL by a separate job).
+- Nothing is built. Still to decide: which MSSQL server, database and table or view, a
+  read-only account, and the "missing thresholds" per airline (RFQ 2.3, stored in the
+  airline settings that nothing reads yet).
+- The return flight can depart the next day (RFQ 2.2 item 5), so match departures to the
+  outbound flight through the return-flight map, not by date.
+
+Amendments report (later, not started; RFQ Annex 12 section 2.4 item 2):
+
+- A report listing selected airline flights within a date range, to show how accurate the
+  I033/I034 extraction was and how many user amendments were made. Its purpose is to show
+  whether the mapping rules need improving or a scenario is unhandled.
+- The data already exists: versions with `created_source` of `SYSTEM` or `USER`, so an
+  amendment is a `USER` version after a `SYSTEM` one. The audit trail (`/audit`) shows the
+  raw events but does not summarise them.
+- RFQ 2.4 also asks that an AMF be traceable to the P24H and P06H versions it was built
+  from. Check that the AMF record keeps those version references.
+- Possible content, to agree with the owner: per airline and period, flights processed,
+  flights amended, amendments per flight, which classes or meal codes were changed most.
+  The RFQ also asks (section 2.2) for export to Excel or PDF of dashboard and reports.
 
 ## Open
 
@@ -265,7 +342,7 @@ With the owner:
 - Accept or change the proposed table `scatdd_i033_review_test` in the draft SQL.
 - Provide the list of valid special meal codes (reminder owed).
 - Whether `.claude/launch.json` stays in the repo.
-- Whether to push the branch and open a pull request.
+- Whether to open a pull request (the branch is on GitHub).
 
 With the intern:
 
@@ -288,6 +365,8 @@ With IT:
 - Entra app registration (tenant id, client id, secret, redirect URL) and the ICC1, ICC2
   and admin groups with test users.
 - A Redis for sessions.
+- Read-only access to the MSSQL departure-time database, and a network route to it from
+  wherever the console runs (it is SATS-network only; the VPN test is still to do).
 - Which Dify instance production uses; the current one is a dev instance.
 
 With the users:
