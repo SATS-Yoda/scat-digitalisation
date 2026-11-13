@@ -1,0 +1,145 @@
+/*
+ * SATS × shadcn/ui — Token bridge
+ * ====================================================================
+ * Maps SATS design tokens → shadcn/ui CSS custom property names.
+ *
+ * DROP THIS FILE into any shadcn/ui project alongside colors_and_type.css.
+ * It replaces shadcn's default globals.css colour block entirely.
+ *
+ * shadcn/ui requires bare HSL channels (no hsl() wrapper) so they
+ * compose with alpha in Tailwind utilities, e.g. bg-primary/50.
+ *
+ * Mapping reference
+ * -----------------
+ * SATS token                shadcn var           Hex (light)
+ * surface-primary         → --background         #FFFFFF
+ * text-primary            → --foreground         #1A1A1A
+ * surface-primary         → --card               #FFFFFF
+ * text-primary            → --card-foreground    #1A1A1A
+ * surface-primary         → --popover            #FFFFFF
+ * text-primary            → --popover-foreground #1A1A1A
+ * color-brand-primary     → --primary            #EE2536
+ * white                   → --primary-foreground #FFFFFF
+ * surface-secondary       → --secondary          #F8F9FA
+ * text-primary            → --secondary-foregrnd #1A1A1A
+ * surface-tertiary        → --muted              #F1F3F5
+ * text-muted              → --muted-foreground   #777777
+ * surface-hover           → --accent             #E9ECEF
+ * text-primary            → --accent-foreground  #1A1A1A
+ * color-error             → --destructive        #EF4444
+ * white                   → --destructive-foregrn#FFFFFF
+ * border-default          → --border             #E6E6E6
+ * border-default          → --input              #E6E6E6
+ * border-focus            → --ring               #30A9CE
+ * radius-md               → --radius             8px / 0.5rem
+ * viz palette             → --chart-1…5
+ * ====================================================================
+ */
+
+:root {
+  /* Surfaces + text */
+  --background:              0 0% 100%;      /* @kind color */ /* surface-primary   #FFFFFF */
+  --foreground:              0 0% 10%;       /* @kind color */ /* text-primary      #1A1A1A */
+
+  --card:                    0 0% 100%;      /* @kind color */ /* surface-primary   #FFFFFF */
+  --card-foreground:         0 0% 10%;       /* @kind color */ /* text-primary      #1A1A1A */
+
+  --popover:                 0 0% 100%;      /* @kind color */ /* surface-primary   #FFFFFF */
+  --popover-foreground:      0 0% 10%;       /* @kind color */ /* text-primary      #1A1A1A */
+
+  /* Brand — primary action */
+  --primary:                 355 85% 54%;    /* @kind color */ /* color-brand-primary  #EE2536 */
+  --primary-foreground:      0 0% 100%;      /* @kind color */ /* white */
+
+  /* Secondary — subdued action */
+  --secondary:               210 17% 98%;    /* @kind color */ /* surface-secondary #F8F9FA */
+  --secondary-foreground:    0 0% 10%;       /* @kind color */ /* text-primary      #1A1A1A */
+
+  /* Muted — low-emphasis surfaces */
+  --muted:                   210 11% 95%;    /* @kind color */ /* surface-tertiary  #F1F3F5 */
+  --muted-foreground:        0 0% 47%;       /* @kind color */ /* text-muted        #777777 */
+
+  /* Accent — hover / highlight */
+  --accent:                  210 14% 93%;    /* @kind color */ /* surface-hover     #E9ECEF */
+  --accent-foreground:       0 0% 10%;       /* @kind color */ /* text-primary      #1A1A1A */
+
+  /* Destructive */
+  --destructive:             0 84% 60%;      /* @kind color */ /* color-error       #EF4444 */
+  --destructive-foreground:  0 0% 100%;      /* @kind color */ /* white */
+
+  /* Borders + inputs */
+  --border:                  0 0% 90%;       /* @kind color */ /* border-default    #E6E6E6 */
+  --input:                   0 0% 90%;       /* @kind color */ /* border-default    #E6E6E6 */
+  --ring:                    194 62% 50%;    /* @kind color */ /* border-focus      #30A9CE */
+
+  /* Radius — md step as the shadcn base; sm/lg are derived by shadcn */
+  --radius: 0.5rem;                          /* @kind radius */ /* radius-md = 8px */
+
+  /* Chart palette (shadcn charts) — SATS viz palette */
+  --chart-1:  215 54% 28%;    /* @kind color */ /* viz-blue    #1F5575 */
+  --chart-2:  194 62% 50%;    /* @kind color */ /* viz-sky     #30A9CE */
+  --chart-3:  159 43% 40%;    /* @kind color */ /* viz-green   #418E3D */
+  --chart-4:  172 47% 54%;    /* @kind color */ /* viz-mint    #4FC6B7 */
+  --chart-5:  36 100% 58%;    /* @kind color */ /* viz-orange  #FFA62B */
+
+  /* Sidebar (shadcn sidebar component) */
+  --sidebar:                 210 17% 98%;    /* @kind color */ /* surface-secondary #F8F9FA */
+  --sidebar-foreground:      0 0% 10%;       /* @kind color */ /* text-primary      #1A1A1A */
+  --sidebar-primary:         355 85% 54%;    /* @kind color */ /* brand-primary     #EE2536 */
+  --sidebar-primary-foreground: 0 0% 100%;  /* @kind color */ /* white */
+  --sidebar-accent:          210 14% 93%;    /* @kind color */ /* surface-hover     #E9ECEF */
+  --sidebar-accent-foreground: 0 0% 10%;    /* @kind color */ /* text-primary      #1A1A1A */
+  --sidebar-border:          0 0% 90%;       /* @kind color */ /* border-default    #E6E6E6 */
+  --sidebar-ring:            194 62% 50%;    /* @kind color */ /* border-focus      #30A9CE */
+}
+
+/* Dark theme — triggered by .dark class (shadcn default) OR
+   [data-theme="dark"] attribute (SATS token convention).
+   Both selectors are applied so the system works either way. */
+.dark,
+[data-theme="dark"] {
+  --background:              0 0% 7%;        /* @kind color */ /* dark-surface-primary   #121212 */
+  --foreground:              0 0% 96%;       /* @kind color */ /* text-primary (dark)    #F5F5F5 */
+
+  --card:                    0 0% 12%;       /* @kind color */ /* dark-surface-secondary #1E1E1E */
+  --card-foreground:         0 0% 96%;       /* @kind color */ /* text-primary (dark)    #F5F5F5 */
+
+  --popover:                 0 0% 15%;       /* @kind color */ /* dark-surface-tertiary  #262626 */
+  --popover-foreground:      0 0% 96%;       /* @kind color */ /* text-primary (dark)    #F5F5F5 */
+
+  --primary:                 355 85% 54%;    /* @kind color */ /* brand-primary unchanged        */
+  --primary-foreground:      0 0% 100%;      /* @kind color */
+
+  --secondary:               0 0% 15%;       /* @kind color */ /* dark-surface-tertiary  #262626 */
+  --secondary-foreground:    0 0% 82%;       /* @kind color */ /* text-secondary (dark)  #D0D0D0 */
+
+  --muted:                   0 0% 15%;       /* @kind color */ /* dark-surface-tertiary  #262626 */
+  --muted-foreground:        0 0% 63%;       /* @kind color */ /* text-muted (dark)      #A0A0A0 */
+
+  --accent:                  0 0% 20%;       /* @kind color */ /* dark-surface-hover     #333333 */
+  --accent-foreground:       0 0% 96%;       /* @kind color */ /* text-primary (dark)    #F5F5F5 */
+
+  --destructive:             0 84% 60%;      /* @kind color */ /* color-error unchanged          */
+  --destructive-foreground:  0 0% 100%;      /* @kind color */
+
+  --border:                  0 0% 20%;       /* @kind color */ /* border-default (dark)  #333333 */
+  --input:                   0 0% 20%;       /* @kind color */ /* border-default (dark)  #333333 */
+  --ring:                    194 62% 50%;    /* @kind color */ /* border-focus unchanged #30A9CE */
+
+  /* Chart palette — dark viz variants */
+  --chart-1:  218 55% 55%;    /* @kind color */ /* dark-viz-blue    #4A9FD1 */
+  --chart-2:  193 72% 63%;    /* @kind color */ /* dark-viz-sky     #5EC7E5 */
+  --chart-3:  117 40% 55%;    /* @kind color */ /* dark-viz-green   #5FBF5A */
+  --chart-4:  174 53% 64%;    /* @kind color */ /* dark-viz-mint    #74D9CD */
+  --chart-5:  36 100% 68%;    /* @kind color */ /* dark-viz-orange  #FFBC5C */
+
+  /* Sidebar */
+  --sidebar:                 0 0% 12%;       /* @kind color */ /* dark-surface-secondary #1E1E1E */
+  --sidebar-foreground:      0 0% 96%;       /* @kind color */ /* text-primary (dark)    #F5F5F5 */
+  --sidebar-primary:         355 85% 54%;    /* @kind color */ /* brand-primary unchanged        */
+  --sidebar-primary-foreground: 0 0% 100%;  /* @kind color */
+  --sidebar-accent:          0 0% 20%;       /* @kind color */ /* dark-surface-hover     #333333 */
+  --sidebar-accent-foreground: 0 0% 96%;    /* @kind color */
+  --sidebar-border:          0 0% 20%;       /* @kind color */ /* border-default (dark)  #333333 */
+  --sidebar-ring:            194 62% 50%;    /* @kind color */ /* border-focus unchanged         */
+}

@@ -1,0 +1,52 @@
+/*
+ * SATS Enterprise Design System — self-hosted brand fonts
+ * ====================================================================
+ * Both faces are served from this package. Nothing is fetched from a
+ * third-party CDN: an @import from Google Fonts leaves the SATS network on
+ * every page load and is subject to proxy inspection, which is why the
+ * Roboto import that used to sit in colors_and_type.css is gone.
+ *
+ * Inter          SIL OFL 1.1 · Rasmus Andersson · v4.1
+ *                github.com/rsms/inter
+ *                One variable file, weights 100-900. It replaces Segoe UI,
+ *                which ships with Windows under a licence that does not
+ *                cover @font-face, so it could never legally be served from
+ *                a SATS origin. Segoe UI stays in the stack as a fallback,
+ *                because on the Windows machines this software targets it is
+ *                already installed and is the closest match while Inter
+ *                loads.
+ *
+ * Cascadia Mono  SIL OFL 1.1 · Microsoft · v2407.24
+ *                github.com/microsoft/cascadia-code
+ *                One variable file, weights 200-700. The @font-face for this
+ *                existed before the file did, so every consumer was making a
+ *                404 request for it on load.
+ *
+ * Consumers copy this file and the fonts/ directory together — the url()
+ * paths are relative to this file, not to the importing sheet.
+ * ====================================================================
+ */
+
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Inter ships tabular figures (tnum) and a slashed zero (zero), and neither is
+   on by default. Turn them on wherever numbers sit in columns, or where 0
+   against O has to be unambiguous — flight numbers, PNRs, station codes:
+
+     font-variant-numeric: tabular-nums slashed-zero;
+
+   Not applied globally: proportional figures read better in prose. */
+
+@font-face {
+  font-family: "Cascadia Mono";
+  src: url("./fonts/CascadiaMono.woff2") format("woff2");
+  font-weight: 200 700;
+  font-style: normal;
+  font-display: swap;
+}

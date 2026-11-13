@@ -1,0 +1,52 @@
+@import "./styles/sats/colors_and_type.css";
+@import "./styles/sats/shadcn-theme.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: var(--border-default);
+  }
+  /* The token sheet gives headings bottom margins for prose; layouts here space with gap. */
+  h1, h2, h3, h4, p {
+    margin: 0;
+  }
+}
+
+@layer base {
+  /* Native controls (date picker, select arrow, scrollbars) follow the theme. */
+  [data-theme="dark"] {
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  /* Operational blue for links. --viz-blue is the same hue as the brand secondary in the
+     light theme and is the only blue token with a dark-theme variant. */
+  .link {
+    color: var(--viz-blue);
+  }
+  .link:hover {
+    text-decoration: underline;
+  }
+
+  /* Dense operational table (custom per the design standard: shadcn has no dense variant). */
+  .tbl {
+    @apply w-full border-collapse text-sm;
+  }
+  .tbl th {
+    @apply whitespace-nowrap border-b bg-surface-secondary px-sm py-xs text-left text-xs font-semibold text-content-secondary;
+  }
+  .tbl td {
+    @apply border-b border-edge-subtle px-sm py-xs align-middle;
+  }
+  .tbl tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .num {
+    @apply font-mono;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+}
