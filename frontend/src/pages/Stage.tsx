@@ -578,7 +578,11 @@ export function StagePage() {
               ) : null}
             </>
           ) : (
-            <span className="text-content-secondary">Check the data against the source email, then send.</span>
+            <span className="text-content-secondary">
+              {stage.state === "NOT_RELEASED"
+                ? "Marked as not released, so nothing is sent. You can still send it later."
+                : "Check the data against the source email, then send."}
+            </span>
           )}
         </div>
         {stage.locked ? null : (
